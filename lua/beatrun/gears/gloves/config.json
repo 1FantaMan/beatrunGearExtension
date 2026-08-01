@@ -1,9 +1,0 @@
-{
-    "name": "gloves",
-    "level": 1,
-    "type": "armRight",
-
-    "wallrun_speed_cap": 700,
-    "wallrun_power": 0.3,
-    "wallclimb_power": 0.45
-}
