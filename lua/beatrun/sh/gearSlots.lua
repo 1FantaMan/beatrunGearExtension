@@ -4,7 +4,7 @@ mod.SLOTS = {
     armLeft = {
         active = true,
         concmd = "brg_activate_armLeft",
-        defaultKey = MOUSE_MIDDLE
+        defaultKey = KEY_E
     },
     back = {
         active = true,
