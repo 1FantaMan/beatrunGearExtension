@@ -1,9 +1,27 @@
 local mod = {}
 
-hook.Add("OnParkour", "GrapplerLandEvent", function(action, ply)
-    if action ~= "land" then return end
-    ply:SetNW2Float("brgear_grappler_land_time", CurTime())
-end)
+-- same door classes Beatrun's own melee door-bash (sh/Melee.lua) checks for
+local DOOR_CLASSES = {
+    prop_door_rotating = true,
+    func_door_rotating = true,
+}
+
+local function PlayFireSound(ply)
+    util.PrecacheSound(mod.config.fire_sound)
+    ply:EmitSound(mod.config.fire_sound, 90, 100, 1)
+end
+
+-- targetEnt/targetLocalOffset let the rope track a moving entity (e.g. a
+-- swinging door) instead of a fixed world point - omit them to clear any
+-- previous tracked entity and just use the static targetPos.
+local function BroadcastRopeVisual(ply, targetPos, arrivalTime, targetEnt, targetLocalOffset)
+    ply:SetNW2Bool("brgear_grapple_active", true)
+    ply:SetNW2Vector("brgear_grapple_target", targetPos)
+    ply:SetNW2Float("brgear_grapple_fire_time", CurTime())
+    ply:SetNW2Float("brgear_grapple_arrival_time", arrivalTime)
+    ply:SetNW2Entity("brgear_grapple_target_ent", targetEnt or NULL)
+    ply:SetNW2Vector("brgear_grapple_target_offset", targetLocalOffset or vector_origin)
+end
 
 function mod.init(ply)
     return {
@@ -13,7 +31,6 @@ function mod.init(ply)
         pullDelay = 0,
         boostTime = 0,
         waitingForLanding = false,
-        landBaseline = 0,
         landedTime = nil,
         usesRemaining = mod.config.max_uses,
     }
@@ -21,12 +38,10 @@ end
 
 function mod.activate(ply, state)
     if state.phase ~= "idle" then
-        ply:ChatPrint("[Grappler] Still finishing the last grapple.")
         return false
     end
 
     if state.usesRemaining <= 0 then
-        ply:ChatPrint("[Grappler] Out of uses — land to recharge.")
         return false
     end
 
@@ -41,18 +56,87 @@ function mod.activate(ply, state)
     })
 
     if not trace.Hit then
-        ply:ChatPrint("[Grappler] Nothing in range to grapple onto.")
         return false
     end
+
+    if IsValid(trace.Entity) and DOOR_CLASSES[trace.Entity:GetClass()] then
+        local door = trace.Entity
+
+        -- close enough to just melee-bash it instead - don't fire the grapple
+        if startPos:Distance(trace.HitPos) < mod.config.door_melee_range then
+            return false
+        end
+
+        if door:GetInternalVariable("m_bLocked") then
+            return false
+        end
+
+        PlayFireSound(ply)
+
+        -- rope shows instantly (no travel delay) - only the actual door
+        -- open is delayed. targetLocalOffset is the hit point expressed
+        -- relative to the door's own pos/angles at fire time, so the rope
+        -- can track it live as the door swings open
+        local targetLocalOffset = WorldToLocal(trace.HitPos, angle_zero, door:GetPos(), door:GetAngles())
+
+        state.targetPos = trace.HitPos
+        state.arrivalTime = CurTime()
+        state.phase = "done"
+        state.boostTime = CurTime()
+
+        BroadcastRopeVisual(ply, trace.HitPos, state.arrivalTime, door, targetLocalOffset)
+
+        timer.Simple(mod.config.door_open_delay, function()
+            if not IsValid(door) then return end
+
+            -- prop_door_rotating/func_door_rotating have a real "Open
+            -- Direction" keyvalue (opendir: 0=both/default away-from-user,
+            -- 1=forward only, 2=backward only) that forces a fixed swing
+            -- direction regardless of the activator's position - deterministic,
+            -- unlike Use()'s default "away from whoever opened it" behavior.
+            -- Pick whichever forces it toward the player via a dot product
+            -- against the door's own forward vector.
+            local towardPlayer = (ply:GetPos() - door:GetPos()):GetNormalized()
+            local openForward = door:GetForward():Dot(towardPlayer) > 0
+
+            door:SetKeyValue("opendir", openForward and "1" or "2")
+
+            local speed = door:GetInternalVariable("speed")
+            door.grapplerOldSpeed = door.grapplerOldSpeed or speed
+
+            door:SetSaveValue("speed", door.grapplerOldSpeed * 4)
+            door:Use(ply)
+            door:Fire("Lock")
+            door:EmitSound("Door.Barge")
+            ply:ViewPunch(Angle(15, 10, 0))
+
+            timer.Simple(1, function()
+                if IsValid(door) then
+                    door:SetSaveValue("speed", door.grapplerOldSpeed)
+                    door:SetKeyValue("opendir", "0")
+                    door:Fire("Unlock")
+                end
+            end)
+        end)
+
+        return
+    end
+
+    -- cancel wallrun/wallclimb so they stop fighting the grapple's velocity
+    ply:SetWallrun(0)
+    ply:SetWallrunTime(0)
+    ply:SetClimbing(0)
+    ply:SetDive(false)
 
     state.usesRemaining = state.usesRemaining - 1
     ply:SetNW2Int("brgear_grapple_uses_remaining", state.usesRemaining)
 
-    util.PrecacheSound(mod.config.fire_sound)
-    ply:EmitSound(mod.config.fire_sound, 90, 100, 1)
+    PlayFireSound(ply)
 
     debugoverlay.Line(startPos, trace.HitPos, 2, Color(0, 255, 0))
     debugoverlay.Cross(trace.HitPos, 10, 2, Color(255, 0, 0))
+
+    ply:ViewPunch(Angle(2, 5, 0))
 
     local distance = startPos:Distance(trace.HitPos)
     local travelTime = math.min(mod.config.max_travel_time, distance / mod.config.travel_speed)
@@ -62,10 +146,7 @@ function mod.activate(ply, state)
     state.arrivalTime = CurTime() + travelTime
     state.pullDelay = math.min(mod.config.max_pull_delay, distance / mod.config.pull_delay_speed)
 
-    ply:SetNW2Bool("brgear_grapple_active", true)
-    ply:SetNW2Vector("brgear_grapple_target", trace.HitPos)
-    ply:SetNW2Float("brgear_grapple_fire_time", CurTime())
-    ply:SetNW2Float("brgear_grapple_arrival_time", state.arrivalTime)
+    BroadcastRopeVisual(ply, trace.HitPos, state.arrivalTime)
 end
 
 function mod.onSetupMove(ply, mv, state)
@@ -77,16 +158,37 @@ function mod.onSetupMove(ply, mv, state)
         return
     end
 
+    local fallSpeed = -mv:GetVelocity().z
+    if fallSpeed > mod.config.fall_damage_threshold then
+        local damage = (fallSpeed - mod.config.fall_damage_threshold) * mod.config.fall_damage_scale
+        ply:TakeDamage(damage, ply, ply)
+
+        if not ply:Alive() then
+            return
+        end
+    end
+
     local direction = (state.targetPos - ply:EyePos()):GetNormalized()
     local currentSpeed = mv:GetVelocity():Length()
     local boostSpeed = math.min(mod.config.push_max_speed, math.max(mod.config.push_speed, currentSpeed * mod.config.push_speed_multiplier))
+
+    if fallSpeed > mod.config.fall_damage_threshold then
+        local excess = fallSpeed - mod.config.fall_damage_threshold
+        local penalty = math.max(mod.config.min_fall_push_penalty, 1 - excess * mod.config.fall_push_penalty_scale)
+        boostSpeed = boostSpeed * penalty
+    end
 
     mv:SetVelocity(direction * boostSpeed)
 
     state.phase = "done"
     state.boostTime = CurTime()
     state.waitingForLanding = true
-    state.landBaseline = ply:GetNW2Float("brgear_grappler_land_time", 0)
+end
+
+function mod.onParkour(ply, state, action)
+    if action ~= "land" or not state.waitingForLanding then return end
+    state.waitingForLanding = false
+    state.landedTime = CurTime()
 end
 
 function mod.onTick(ply, state)
@@ -95,8 +197,7 @@ function mod.onTick(ply, state)
         ply:SetNW2Bool("brgear_grapple_active", false)
     end
 
-    local landedViaEvent = ply:GetNW2Float("brgear_grappler_land_time", 0) > state.landBaseline
-    if state.waitingForLanding and (ply:IsOnGround() or landedViaEvent) then
+    if state.waitingForLanding and ply:IsOnGround() then
         state.waitingForLanding = false
         state.landedTime = CurTime()
     end

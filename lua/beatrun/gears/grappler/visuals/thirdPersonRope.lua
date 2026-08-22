@@ -3,7 +3,7 @@ local ropeMaterial = CreateMaterial("BeatrunGrappleRope", "UnlitGeneric", {
     ["$vertexcolor"] = 1,
     ["$vertexalpha"] = 1,
 })
-local ropeColor = Color(0, 0, 15)
+local ropeColor = include("beatrun/gears/grappler/visuals/ropeColor.lua").color
 
 local MAX_COIL_RADIUS = 4
 local MAX_ROTATIONS = 6
@@ -27,6 +27,9 @@ end
 hook.Add("PostDrawTranslucentRenderables", "BeatrunGearsRopeDraw", function()
     for _, ply in ipairs(player.GetAll()) do
         if not ply:GetNW2Bool("brgear_grapple_active", false) then continue end
+        if ply == LocalPlayer() and not ply:ShouldDrawLocalPlayer() then continue end
+
+        ply:SetupBones()
 
         local boneID = ply:LookupBone("ValveBiped.Bip01_L_Hand")
 
@@ -35,6 +38,14 @@ hook.Add("PostDrawTranslucentRenderables", "BeatrunGearsRopeDraw", function()
         local targetPos = ply:GetNW2Vector("brgear_grapple_target")
         local fireTime = ply:GetNW2Float("brgear_grapple_fire_time", 0)
         local arrivalTime = ply:GetNW2Float("brgear_grapple_arrival_time", 0)
+
+        -- if grappling a moving entity (e.g. a door), track its live
+        -- position instead of the fixed point it was at when fired
+        local targetEnt = ply:GetNW2Entity("brgear_grapple_target_ent")
+        if IsValid(targetEnt) then
+            local targetOffset = ply:GetNW2Vector("brgear_grapple_target_offset")
+            targetPos = LocalToWorld(targetOffset, angle_zero, targetEnt:GetPos(), targetEnt:GetAngles())
+        end
 
         local hookPos = targetPos
         local tightenProgress = 0
