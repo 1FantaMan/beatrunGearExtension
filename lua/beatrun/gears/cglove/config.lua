@@ -1,0 +1,8 @@
+return {
+    name = "cglove",
+    displayname = "Climbing Glove",
+    level = 1,
+    type = "armRight",
+
+    wallclimb_power = 0.7,
+}

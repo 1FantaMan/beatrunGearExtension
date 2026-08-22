@@ -24,10 +24,15 @@ end
 
 local function OnGearActivate()
     local slot = net.ReadString()
+    local name = net.ReadString()
+    local serverShared = net.ReadTable()
 
     if clientGears[slot] == nil or clientGears[slot] == "" then
         return
     end
+
+    clientGears[slot].state.shared = clientGears[slot].state.shared or {}
+    table.Merge(clientGears[slot].state.shared, serverShared)
 
     gearsHandler.GetClientGear(clientGears[slot].name).activate(LocalPlayer(), clientGears[slot].state)
 end

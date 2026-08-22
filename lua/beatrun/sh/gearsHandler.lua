@@ -20,12 +20,8 @@ function mod.GetServerGear(name)
 
     local gear = include(initPath)
 
-    local configPath = folder .. "config.json"
-    if file.Exists(configPath, "LUA") then
-        gear.config = util.JSONToTable(file.Read(configPath, "LUA")) or {}
-    else
-        gear.config = {}
-    end
+    local configPath = folder .. "config.lua"
+    gear.config = file.Exists(configPath, "LUA") and include(configPath) or {}
 
     gear.name = name
     serverCache[name] = gear
@@ -49,12 +45,8 @@ function mod.GetClientGear(name)
 
     local gear = include(initPath)
 
-    local configPath = folder .. "config.json"
-    if file.Exists(configPath, "LUA") then
-        gear.config = util.JSONToTable(file.Read(configPath, "LUA")) or {}
-    else
-        gear.config = {}
-    end
+    local configPath = folder .. "config.lua"
+    gear.config = file.Exists(configPath, "LUA") and include(configPath) or {}
 
     gear.name = name
     clientCache[name] = gear

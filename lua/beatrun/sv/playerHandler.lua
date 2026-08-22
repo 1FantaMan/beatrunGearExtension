@@ -22,6 +22,22 @@ local function OnTick()
     end
 end
 
+local function OnParkour(action, ply)
+    if not IsValid(ply) then return end
+
+    local data = mod.plys[ply:SteamID64()]
+    if data == nil then return end
+
+    for slot, gearData in pairs(data.gears) do
+        if gearData == "" then continue end
+
+        local gear = gearsHandler.GetServerGear(gearData.name)
+        if gear and gear.onParkour then
+            gear.onParkour(ply, gearData.state, action)
+        end
+    end
+end
+
 local function OnSetupMove(ply, mv, cmd)
     local data = mod.plys[ply:SteamID64()]
     if data == nil then return end
@@ -183,6 +199,7 @@ function mod.OnGearKeyPress(ply, slot)
     net.Start("BeatrunGearsClientActivate")
         net.WriteString(slot)
         net.WriteString(data.gears[slot].name)
+        net.WriteTable(data.gears[slot].state.shared or {})
     net.Send(ply)
 
     return true, "successfully activated '" .. slot .. "'."
@@ -208,4 +225,5 @@ end
 
 hook.Add("Tick", "BeatrunGearsGearTick", OnTick)
 hook.Add("SetupMove", "BeatrunGearsSetupMove", OnSetupMove)
+hook.Add("OnParkour", "BeatrunGearsOnParkour", OnParkour)
 return mod

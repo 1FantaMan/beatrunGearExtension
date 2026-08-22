@@ -101,6 +101,7 @@ end
 local _, folders = file.Find("beatrun/gears/*", "LUA")
 for _, folderName in ipairs(folders) do
     AddCSLuaFile("beatrun/gears/" .. folderName .. "/client.lua")
+    AddCSLuaFile("beatrun/gears/" .. folderName .. "/config.lua")
 
     local visualFiles = file.Find("beatrun/gears/" .. folderName .. "/visuals/*.lua", "LUA")
     for _, fileName in ipairs(visualFiles) do
