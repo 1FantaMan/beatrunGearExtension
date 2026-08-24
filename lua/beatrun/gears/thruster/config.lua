@@ -12,8 +12,8 @@ return {
 
     jump_power = 270,
 
-    dash_speed = 1.25,
-    dash_max_speed = 550,
+    dash_speed = 1.05,
+    dash_max_speed = 590,
     dive_dash_multiplier = 1.15,
 
     thrust_sound = "beatrun/gears/thruster/thrust.wav",

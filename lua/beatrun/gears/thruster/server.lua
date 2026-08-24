@@ -1,3 +1,7 @@
+local modules = include("beatrun/sh/modules.lua")
+local groundCheck = modules.Get("groundCheck")
+local sound = modules.Get("sound")
+
 local mod = {}
 
 function mod.init(ply)
@@ -36,8 +40,7 @@ function mod.activate(ply, state)
         return false
     end
 
-    util.PrecacheSound(mod.config.thrust_sound)
-    ply:EmitSound(mod.config.thrust_sound)
+    sound.Play(ply, mod.config.thrust_sound)
 
     state.phase = "thrust"
     state.lastUsed = CurTime()
@@ -58,16 +61,20 @@ function mod.onSetupMove(ply, mv, state)
     look.z = 0
     look:Normalize()
 
-    local dashSpeed = math.Clamp(vel:Length() * mod.config.dash_speed,
-        mod.config.dash_max_speed / 2.5,
-        GetConVar("Beatrun_SpeedLimit"):GetFloat() + mod.config.dash_max_speed
-    )
+    local dashSpeed = vel:Length() * mod.config.dash_speed
 
     if ply:GetDive() then
         dashSpeed = dashSpeed * mod.config.dive_dash_multiplier
     end
 
-    vel = look * dashSpeed + Vector(0, 0, math.max(vel.z, mod.config.jump_power))
+    vel.z = math.max(vel.z, mod.config.jump_power)
+
+    if vel:Length() <= mod.config.dash_max_speed then
+        local dash = look * dashSpeed
+        vel.x = dash.x
+        vel.y = dash.y
+    end
+
     mv:SetVelocity(vel)
 
     state.phase = "idle"
@@ -75,6 +82,10 @@ end
 
 function mod.onParkour(ply, state, action)
     if action ~= "land" then
+        return
+    end
+
+    if not groundCheck.IsRealGround(ply) then
         return
     end
 
