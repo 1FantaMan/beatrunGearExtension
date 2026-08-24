@@ -104,6 +104,8 @@ end
 
 local _, folders = file.Find("beatrun/gears/*", "LUA")
 for _, folderName in ipairs(folders) do
+    if folderName == "template" then continue end
+
     AddCSLuaFile("beatrun/gears/" .. folderName .. "/client.lua")
     AddCSLuaFile("beatrun/gears/" .. folderName .. "/config.lua")
 
