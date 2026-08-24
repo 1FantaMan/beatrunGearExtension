@@ -5,7 +5,7 @@ mod.plys = {}
 
 local function OnParkour(action, ply)
     if action ~= "wallrunh" then return end
-    if not gearEquip.IsEquipped(ply, "armRight", "gloves") then return end
+    if not gearEquip.IsEquipped(ply, "right", "gloves") then return end
 
     ply:SetWallrunTime(ply:GetWallrunTime() + mod.config.wallrun_power)
 

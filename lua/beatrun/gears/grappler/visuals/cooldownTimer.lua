@@ -4,7 +4,7 @@ local MARGIN = 100
 
 hook.Add("HUDPaint", "BeatrunGrapplerCooldownTimer", function()
     local ply = LocalPlayer()
-    if not IsValid(ply) or ply:GetNW2String("brgear_armLeft", "") ~= "grappler" then
+    if not IsValid(ply) or ply:GetNW2String("brgear_left", "") ~= "grappler" then
         return
     end
 

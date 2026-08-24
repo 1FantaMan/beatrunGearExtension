@@ -2,7 +2,7 @@ return {
     name = "grappler",
     displayname = "Grappler",
     level = 1,
-    type = "armLeft",
+    type = "left",
     cooldown = 0,
     broadcastActivation = false,
 

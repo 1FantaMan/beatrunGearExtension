@@ -1,9 +1,9 @@
 local mod = {}
 mod.SLOTS = {
-    armRight = { active = false },
-    armLeft = {
+    right = { active = false },
+    left = {
         active = true,
-        concmd = "brg_activate_armLeft",
+        concmd = "brg_activate_left",
         defaultKey = KEY_E
     },
     back = {
