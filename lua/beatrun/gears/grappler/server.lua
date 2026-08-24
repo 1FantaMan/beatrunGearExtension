@@ -1,3 +1,8 @@
+local modules = include("beatrun/sh/modules.lua")
+local groundCheck = modules.Get("groundCheck")
+local sound = modules.Get("sound")
+local movement = modules.Get("movement")
+
 local mod = {}
 
 -- same door classes Beatrun's own melee door-bash (sh/Melee.lua) checks for
@@ -7,8 +12,7 @@ local DOOR_CLASSES = {
 }
 
 local function PlayFireSound(ply)
-    util.PrecacheSound(mod.config.fire_sound)
-    ply:EmitSound(mod.config.fire_sound, 90, 100, 1)
+    sound.Play(ply, mod.config.fire_sound, 90, 100)
 end
 
 -- targetEnt/targetLocalOffset let the rope track a moving entity (e.g. a
@@ -122,11 +126,7 @@ function mod.activate(ply, state)
         return
     end
 
-    -- cancel wallrun/wallclimb so they stop fighting the grapple's velocity
-    ply:SetWallrun(0)
-    ply:SetWallrunTime(0)
-    ply:SetClimbing(0)
-    ply:SetDive(false)
+    movement.CancelAbilities(ply)
 
     state.usesRemaining = state.usesRemaining - 1
     ply:SetNW2Int("brgear_grapple_uses_remaining", state.usesRemaining)
@@ -187,6 +187,7 @@ end
 
 function mod.onParkour(ply, state, action)
     if action ~= "land" or not state.waitingForLanding then return end
+    if not groundCheck.IsRealGround(ply) then return end
     state.waitingForLanding = false
     state.landedTime = CurTime()
 end
@@ -197,7 +198,7 @@ function mod.onTick(ply, state)
         ply:SetNW2Bool("brgear_grapple_active", false)
     end
 
-    if state.waitingForLanding and ply:IsOnGround() then
+    if state.waitingForLanding and groundCheck.IsRealGround(ply) then
         state.waitingForLanding = false
         state.landedTime = CurTime()
     end

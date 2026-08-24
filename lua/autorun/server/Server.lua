@@ -98,6 +98,10 @@ for _, fileName in ipairs(file.Find("beatrun/sh/*.lua", "LUA")) do
     AddCSLuaFile("beatrun/sh/" .. fileName)
 end
 
+for _, fileName in ipairs(file.Find("beatrun/sh/modules/*.lua", "LUA")) do
+    AddCSLuaFile("beatrun/sh/modules/" .. fileName)
+end
+
 local _, folders = file.Find("beatrun/gears/*", "LUA")
 for _, folderName in ipairs(folders) do
     AddCSLuaFile("beatrun/gears/" .. folderName .. "/client.lua")
