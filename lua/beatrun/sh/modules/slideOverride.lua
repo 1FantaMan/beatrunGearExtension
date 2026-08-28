@@ -1,0 +1,709 @@
+-- ported from the standalone beatrunSlideTweak addon: same qslide/qslidestep/qslidespeed
+-- override, but gated per-player on the sglove ("right") gear instead of applying to everyone.
+-- players without sglove fall through to Beatrun's own native hook untouched.
+local gearEquip = include("beatrun/sh/modules.lua").Get("gearEquip")
+
+local qslide_duration = 3
+local qslide_speedmult = 1
+local entryCap = math.huge -- whatever speed you enter the slide with carries straight in (native: 541.44)
+
+-- this refresh can fire every tick while continuously moving downhill/on a slope; used to be 0.865
+-- (a decay) balanced out by the time-based multiplier reapplying ~1.16x on refresh -- now that the
+-- time multiplier is gone, this must be 1 (no decay) or speed compounds to zero within a second.
+local midSlideDecay = 1
+local midSlideCap = math.huge
+
+local ActuallyHoldingCrouch
+
+local slide_sounds = {
+  [MAT_CONCRETE] = { "Slide.Concrete" },
+  [MAT_SAND] = { "Slide.Gravel" },
+  [MAT_METAL] = { "Slide.Metal" },
+  [MAT_VENT] = { "Slide.Duct" },
+  [MAT_TILE] = { "Slide.Marble" },
+  [MAT_GLASS] = { "Slide.Glass" },
+  [MAT_GRATE] = { "Slide.Gantry" },
+  [MAT_PLASTIC] = { "Slide.Tarp" },
+  [MAT_SLOSH] = { "Slide.Water" },
+  [MAT_WOOD] = { "Slide.Wood" }
+}
+
+local slideloop_sounds = {
+  [0] = "Slide.ConcreteLoop",
+  [MAT_GLASS] = "Slide.GlassLoop",
+  [MAT_WOOD] = "Slide.WoodLoop",
+  [MAT_SAND] = "Slide.GravelLoop",
+  [MAT_METAL] = "Slide.MetalLoop",
+  [MAT_GRATE] = "Slide.GantryLoop",
+  [MAT_PLASTIC] = "Slide.TarpLoop",
+  [MAT_SLOSH] = "Slide.WaterLoop",
+  [MAT_TILE] = "Slide.MarbleLoop",
+  [MAT_VENT] = "Slide.DuctLoop"
+}
+
+slide_sounds[MAT_SNOW] = slide_sounds[MAT_SAND]
+slide_sounds[MAT_GRASS] = slide_sounds[MAT_SAND]
+slide_sounds[0] = slide_sounds[MAT_CONCRETE]
+
+slideloop_sounds[MAT_DIRT] = slideloop_sounds[MAT_SAND]
+slideloop_sounds[MAT_GRASS] = slideloop_sounds[MAT_SAND]
+
+local blocked = false
+
+local function SlidingAnimThink()
+  local ba = BodyAnim
+  local ply = LocalPlayer()
+
+  if not ply:GetSliding() then
+    hook.Remove("Think", "SlidingAnimThink")
+  end
+
+  if IsValid(ba) and ba:GetSequence() == 5 and BodyAnimCycle >= 0.55 then
+    ba:SetSequence(6)
+  end
+
+  if IsValid(ba) and ba:GetSequence() == ba:LookupSequence("meslidestart45") and BodyAnimCycle >= 0.55 then
+    ba:SetSequence("meslideloop45")
+  end
+
+  if IsValid(ba) then
+    ply.OrigEyeAng:Set(ply:GetSlidingAngle())
+    ply.OrigEyeAng.x = 0
+
+    local tr = util.QuickTrace(ply:GetPos(), Vector(0, 0, -64), ply)
+    local normal = tr.HitNormal
+    local oldang = ba:GetAngles()
+    local ang = ba:GetAngles()
+    local slidey = ply:GetSlidingAngle().y
+
+    oldang[2] = slidey
+    ang[2] = slidey
+    ang.x = math.max(normal:Angle().x + 90, 360)
+
+    local newang = LerpAngle(20 * FrameTime(), oldang, ang)
+    ba:SetAngles(newang)
+
+    BodyLimitX = math.min(20 + ang[1] - 360, 60)
+    CamShakeMult = ply:GetVelocity():Length() * 0.0005
+  end
+end
+
+local function SlidingAnimStart()
+  if not IsFirstTimePredicted() and not game.SinglePlayer() then return end
+
+  local ply = LocalPlayer()
+
+  if not ply:Alive() then return end
+
+  deleteonend = false
+  BodyLimitY = 80
+  BodyLimitX = 40
+
+  if VMLegs and VMLegs:IsActive() then
+    VMLegs:Remove()
+  end
+
+  if not ply:GetDiveSliding() then
+    CamIgnoreAng = false
+    camjoint = ply:GetSlidingSlippery() and "eyes" or "CameraJoint"
+
+    if BodyAnimString == "meslideend" then
+      BodyAnimCycle = 0.075
+    else
+      BodyAnimCycle = 0
+    end
+
+    BodyAnim:SetSequence(ply:GetSlidingSlippery() and "meslidestart45" or 5)
+  else
+    ParkourEvent("diveslidestart", ply, true)
+  end
+
+  BodyAnim:SetAngles(ply:GetSlidingAngle())
+  ply.OrigEyeAng = ply:GetSlidingAngle()
+
+  if ply:Crouching() or CurTime() < ply:GetCrouchJumpTime() then
+    BodyAnimCycle = 0.1
+    BodyAnim:SetCycle(0.1)
+  end
+
+  CamShake = ply:GetSlidingSlippery()
+  hook.Add("Think", "SlidingAnimThink", SlidingAnimThink)
+end
+
+local function SlidingAnimEnd(slippery, diving)
+  if not IsValid(BodyAnim) then return end
+
+  local ply = LocalPlayer()
+
+  local isDiveSliding = game.SinglePlayer() and diving or ply:GetDiveSliding()
+
+  if ply:GetJumpTurn() then
+    camjoint = "eyes"
+    CamIgnoreAng = true
+
+    return
+  end
+
+  if not slippery then
+    if not isDiveSliding then
+      local crouchEnd = PlayerCannotStand(ply)
+      local endAnim = crouchEnd and "meslideendcrouch" or "meslideend"
+
+      BodyAnimString = endAnim
+      BodyAnim:ResetSequence(endAnim)
+    else
+      local crouchEnd = PlayerCannotStand(ply) or ActuallyHoldingCrouch
+      local endAnim = crouchEnd and "diveslideendcrouch" or "diveslideend"
+
+      ParkourEvent(endAnim, ply, true)
+
+      BodyAnimString = endAnim
+      BodyAnim:ResetSequence(endAnim)
+    end
+
+    BodyAnimCycle = 0
+    BodyAnim:SetCycle(0)
+    BodyAnimSpeed = 1.3
+
+    timer.Simple(0.2, function()
+      if ply:Alive() and BodyAnimString == "meslideend" and BodyAnimArmCopy and not ply:GetSliding() and not ply:OnGround() then
+        BodyAnimCycle = 0
+        camjoint = "eyes"
+
+        BodyAnim:ResetSequence("jumpair")
+      end
+    end)
+  else
+    BodyAnimCycle = 0
+    camjoint = "eyes"
+  end
+
+  timer.Simple(0.5, function()
+    if ply:Alive() and BodyAnimArmCopy and not ply:GetSliding() then
+      camjoint = "eyes"
+
+      BodyLimitY = 180
+      BodyLimitX = 90
+
+      CamIgnoreAng = true
+    end
+  end)
+
+  if blocked then
+    timer.Simple(0.35, function()
+      if IsValid(BodyAnim) then
+        BodyAnim:SetSequence("crouchstill")
+      end
+    end)
+  end
+
+  CamShake = false
+
+  hook.Remove("Think", "SlidingAnimThink")
+end
+
+local slidepunch = Angle(2.5, 0, -0.5)
+local trace_down = Vector(0, 0, 32)
+local trace_tbl = {}
+
+local function SlideSurfaceSound(ply, pos)
+  trace_tbl.start = pos
+  trace_tbl.endpos = pos - trace_down
+  trace_tbl.filter = ply
+
+  local tr = util.TraceLine(trace_tbl)
+  local sndtable = slide_sounds[tr.MatType] or slide_sounds[0]
+  local handstep = HANDSTEPS_SOFT_LUT[tr.MatType] or "ConcreteSoft"
+
+  ply:EmitSound("Cloth.FallShortMedium")
+  if not ply:GetDiveSliding() then
+    ply:EmitSound("Handsteps." .. handstep)
+  end
+  ply:EmitSound(sndtable[math.random(#sndtable)], 75, 100 + math.random(-20, -15), 0.5)
+
+  return tr.MatType
+end
+
+local function SlideLoopSound(ply, pos, mat)
+  local sndtable
+  if ply:WaterLevel() > 0 then
+    sndtable = slideloop_sounds[MAT_SLOSH]
+  else
+    sndtable = slideloop_sounds[mat] or slideloop_sounds[0]
+  end
+
+  ply.SlideLoopSound = CreateSound(ply, sndtable)
+  ply.SlideLoopSound:PlayEx(0.1, 100)
+end
+
+local function HasSlideGlove(ply)
+  return gearEquip.IsEquipped(ply, "right", "sglove")
+end
+
+-- Beatrun's own sh/Sliding.lua registers these under the same hook names; capturing them here
+-- (before we overwrite the hook table entries below) lets non-equipped players fall through to
+-- unmodified native behavior instead of losing sliding entirely.
+local nativeQslide = hook.GetTable().SetupMove and hook.GetTable().SetupMove.qslide
+local nativeQslidestep = hook.GetTable().PlayerFootstep and hook.GetTable().PlayerFootstep.qslidestep
+local nativeQslidespeed = hook.GetTable().StartCommand and hook.GetTable().StartCommand.qslidespeed
+
+local function qslide(ply, mv, cmd)
+  if not HasSlideGlove(ply) then
+    if nativeQslide then return nativeQslide(ply, mv, cmd) end
+    return
+  end
+
+  if not ply:Alive() then return end
+  if ply:GetSafetyRollTime() > CurTime() then return end
+
+  if not ply.OldDuckSpeed then
+    ply.OldDuckSpeed = ply:GetDuckSpeed()
+    ply.OldUnDuckSpeed = ply:GetUnDuckSpeed()
+  end
+
+  local sliding = ply:GetSliding()
+  local speed = mv:GetVelocity()
+  speed.z = 0
+  speed = speed:Length()
+
+  local runspeed = ply:GetRunSpeed()
+  local slidetime = math.max(0.1, qslide_duration)
+  local ducking = mv:KeyDown(IN_DUCK)
+  local crouching = ply:Crouching()
+  local sprinting = mv:KeyDown(IN_SPEED)
+  local onground = ply:OnGround()
+  local CT = CurTime()
+
+  if not ply.SlideSlipperyTrace then
+    local mins, maxs = ply:GetHull()
+    ply.SlideSlipperyTraceOut = {}
+
+    ply.SlideSlipperyTrace = {
+      mask = MASK_SHOT_HULL,
+      collisiongroup = COLLISION_GROUP_PLAYER_MOVEMENT,
+      maxs = maxs,
+      mins = mins,
+      output = ply.SlideSlipperyTraceOut
+    }
+  end
+
+  local slipperytrace = ply.SlideSlipperyTrace
+  local slipperytraceout = ply.SlideSlipperyTraceOut
+  local slipfail = true
+
+  if ply:GetMoveType() == MOVETYPE_WALK then
+    slipperytrace.start = mv:GetOrigin()
+    slipperytrace.endpos = slipperytrace.start
+
+    util.TraceHull(slipperytrace)
+
+    local safestart = slipperytraceout.HitPos
+    slipperytrace.start = safestart
+    slipperytrace.endpos = Vector(safestart)
+    slipperytrace.endpos.z = safestart.z - ply:GetStepSize() * 0.5
+
+    util.TraceHull(slipperytrace)
+
+    if slipperytraceout.Fraction > 0 and slipperytraceout.Fraction < 1 and not slipperytraceout.StartSolid then
+      local slipnormal = slipperytraceout.HitNormal
+      local hitpos = slipperytraceout.HitPos
+      local ent = slipperytraceout.Entity
+
+      slipperytrace.start = safestart
+      slipperytrace.endpos = safestart - Vector(0, 0, 120)
+
+      util.TraceLine(slipperytrace)
+
+      if slipperytraceout.Hit and slipperytraceout.HitNormal:DistToSqr(slipnormal) < 0.3 then
+        local normal = slipnormal
+        local sang = normal:Angle()
+
+        if sang.x > 315 and sang.x < 330 then
+          mv:SetOrigin(hitpos)
+
+          ply:SetGroundEntity(ent)
+          ply:SetCrouchJumpBlocked(false)
+
+          onground = true
+          slipfail = false
+
+          ply:SetCrouchJump(false)
+
+          if SERVER and mv:GetVelocity().z <= -1250 and not ply:InOverdrive() then
+            local dmg = DamageInfo()
+              dmg:SetDamageType(DMG_FALL)
+              dmg:SetDamage(1000)
+            ply:TakeDamageInfo(dmg)
+          end
+        end
+      end
+    end
+  end
+
+  if (not onground or slipfail or ply:GetSlidingSlipperyUpdate() < CT or not slipperytraceout.HitNormal) and slipfail then
+    slipperytrace.filter = ply
+    slipperytrace.start = mv:GetOrigin()
+    slipperytrace.endpos = slipperytrace.start - Vector(0, 0, 32)
+
+    util.TraceHull(slipperytrace)
+
+    ply:SetSlidingSlipperyUpdate(CT + 0.25)
+  end
+
+  local normal = slipperytraceout.HitNormal
+  local sang = normal:Angle()
+  local slippery = sang.x > 315 and sang.x < 330 and ply:GetMoveType() ~= MOVETYPE_NOCLIP and not ply:GetCrouchJump() and onground and not slipfail and ply:WaterLevel() < 1
+
+  ply:SetSlidingSlippery(slippery)
+
+  if slippery then
+    sang.x = 0
+    sang.y = math.floor(sang.y)
+
+    ply:SetSlidingAngle(sang)
+
+    local vel = mv:GetVelocity()
+    vel.z = 0
+
+    if vel:Length() == 0 then
+      local ang = cmd:GetViewAngles()
+      ang.x = 0
+
+      mv:SetVelocity(ang:Forward() * 10)
+    end
+  end
+
+  local able_to_slide = ducking and sprinting and speed > runspeed * 0.5
+  local already_sliding = (ply:GetSlidingDelay() >= CT) or ply:GetSliding()
+
+  if not already_sliding and ply:Alive() and onground and (not ply:GetJumpTurn() or slippery) and (able_to_slide or slippery or ply:GetDive()) then
+    vel = math.min(speed, entryCap) * ply:GetOverdriveMult()
+
+    ParkourEvent(slippery and "slide45" or "slide", ply)
+
+    if slippery then
+      vel = 230
+
+      ply:SetDive(false)
+      ply:SetDiveSliding(false)
+    end
+
+    if ply:GetDive() then
+      ply:SetDiveSliding(true)
+      ply:SetDive(false)
+    end
+
+    ply:SetViewOffset(Vector(0, 0, 64))
+    ply:SetSliding(true)
+
+    local slidecalctime = slidetime * math.min(vel / 300, 1)
+    ply:SetSlidingTime(CT + slidecalctime)
+
+    if not ply:Crouching() then
+      ply:ViewPunch(slidepunch)
+    end
+
+    ply:SetDuckSpeed(0.1)
+    ply:SetUnDuckSpeed(0.05)
+
+    if not slippery then
+      if not ply:GetDiveSliding() then
+        ply:SetSlidingAngle(mv:GetVelocity():Angle())
+      else
+        local ang = cmd:GetViewAngles()
+        ang.x = 0
+        ply:SetSlidingAngle(ang)
+      end
+    end
+
+    ply:SetSlidingVel(vel)
+    ply:SetSlidingStrafe(0)
+    ply.SlidingInitTime = CT
+
+    if game.SinglePlayer() then
+      ply:SendLua("LocalPlayer().SlidingInitTime = CurTime()")
+    end
+
+    ply:SetJumpTurn(false)
+    ply:SetJumpTurnRecovery(0)
+
+    if SERVER then
+      local pos = mv:GetOrigin()
+      local mat = SlideSurfaceSound(ply, pos)
+
+      SlideLoopSound(ply, pos, mat)
+    end
+
+    if game.SinglePlayer() then
+      net.Start("sliding_spfix")
+      net.Send(ply)
+    end
+
+    if CLIENT and IsFirstTimePredicted() then
+      SlidingAnimStart()
+
+      hook.Add("Think", "SlidingAnimThink", SlidingAnimThink)
+    end
+  elseif (not ducking and ply:GetMelee() == 0 and not slippery or not onground) and sliding then
+    blocked = false
+
+    if not ducking then
+      ply.SlideHull = ply.SlideHull or {}
+      ply.SlideHullOut = ply.SlideHullOut or {}
+
+      local hulltr = ply.SlideHull
+      local hulltrout = ply.SlideHullOut
+      local mins, maxs = ply:GetHull()
+      local origin = mv:GetOrigin()
+
+      hulltr.start = origin
+      hulltr.endpos = origin
+      hulltr.maxs = maxs
+      hulltr.mins = mins
+      hulltr.filter = ply
+      hulltr.mask = MASK_PLAYERSOLID
+      hulltr.collisiongroup = COLLISION_GROUP_PLAYER_MOVEMENT
+      hulltr.output = hulltrout
+
+      util.TraceHull(hulltr)
+
+      if hulltrout.Hit then
+        blocked = true
+      end
+    end
+
+    ply:SetCrouchJumpBlocked(false)
+    ply:SetSliding(false)
+    ply:SetSlidingTime(0)
+    ply:ViewPunch(Angle(0.85, 0.35, 0))
+
+    if ply:GetSlidingVel() > 400 then
+      ply:SetMEMoveLimit(600)
+    end
+
+    if game.SinglePlayer() then
+      net.Start("sliding_spend")
+        net.WriteBool(blocked)
+        net.WriteBool(false)
+        net.WriteBool(ply:GetDiveSliding())
+      net.Send(ply)
+    elseif CLIENT and IsFirstTimePredicted() then
+      SlidingAnimEnd(false)
+    end
+    ply:SetDiveSliding(false)
+
+    ply:SetSlidingDelay(CT + 0.1)
+
+    if SERVER and ply.SlideLoopSound then
+      ply.SlideLoopSound:FadeOut(0.15)
+    end
+
+    ply:ConCommand("-duck")
+
+    ply:SetViewOffsetDucked(Vector(0, 0, 32))
+  end
+
+  sliding = ply:GetSliding()
+
+  if sliding then
+    local eyeang = cmd:GetViewAngles()
+    eyeang.x = 0
+    eyeang.z = 0
+    eyeang = eyeang:Forward()
+
+    ply:SetViewOffsetDucked(Vector(0, 0, 28) + eyeang * -25)
+    local slidedelta = (ply:GetSlidingTime() - CT) / slidetime
+
+    local speed = ply:GetSlidingVel() * qslide_speedmult
+    mv:SetVelocity(ply:GetSlidingAngle():Forward() * speed)
+
+    local pos = mv:GetOrigin()
+
+    if not ply:GetSlidingLastPos() then
+      ply:SetSlidingLastPos(pos)
+    end
+
+    if not slippery and pos.z > ply:GetSlidingLastPos().z + 1 then
+      ply:SetSlidingTime(ply:GetSlidingTime() - 0.025)
+    elseif slippery or slidedelta < 1 and pos.z < ply:GetSlidingLastPos().z - 0.25 then
+      ply:SetSlidingTime(CT + slidetime)
+      ply:SetSlidingVel(math.min(mv:GetVelocity():Length() * midSlideDecay, midSlideCap * ply:GetOverdriveMult()))
+    end
+
+    ply:SetSlidingLastPos(pos)
+
+    if slippery then
+      if mv:KeyDown(IN_MOVERIGHT) then
+        ply:SetSlidingStrafe(math.Clamp(ply:GetSlidingStrafe() - FrameTime() * 125, -300, 300))
+      elseif mv:KeyDown(IN_MOVELEFT) then
+        ply:SetSlidingStrafe(math.Clamp(ply:GetSlidingStrafe() + FrameTime() * 125, -300, 300))
+      else
+        ply:SetSlidingStrafe(math.Approach(ply:GetSlidingStrafe(), 0, FrameTime() * 5))
+      end
+
+      mv:SetVelocity(mv:GetVelocity() - ply:GetSlidingAngle():Right() * ply:GetSlidingStrafe())
+
+      if mv:KeyPressed(IN_JUMP) then
+        local vel = mv:GetVelocity()
+        vel:Mul(math.min(math.max(speed, 300) / 300, 1))
+        vel.z = 175
+
+        ply:SetSliding(false)
+        ply:SetSlidingTime(0)
+
+        if CLIENT then
+          BodyAnimSetEase(mv:GetOrigin())
+        elseif game.SinglePlayer() then
+          ply:SetNW2Vector("SPBAEase", mv:GetOrigin())
+          ply:SendLua("BodyAnimSetEase(LocalPlayer():GetNW2Vector('SPBAEase'))")
+        end
+
+        mv:SetOrigin(mv:GetOrigin() + Vector(0, 0, 33))
+
+        ply:SetGroundEntity(nil)
+        ply:SetSlidingSlippery(false)
+
+        mv:SetVelocity(vel)
+
+        ParkourEvent("jumpslide", ply)
+      end
+    end
+
+    if not slippery then
+      if mv:KeyDown(IN_MOVELEFT) then
+        local ang = ply:GetSlidingAngle()
+        ang.y = ang.y + 0.5
+
+        ply:SetSlidingAngle(ang)
+      elseif mv:KeyDown(IN_MOVERIGHT) then
+        local ang = ply:GetSlidingAngle()
+        ang.y = ang.y - 0.5
+
+        ply:SetSlidingAngle(ang)
+      end
+    end
+
+    if mv:KeyPressed(IN_BACK) and ply:GetMelee() == 0 and ply:GetSlidingTime() < CT + slidetime * 0.95 and not PlayerCannotStand(ply) then
+      if CLIENT and IsFirstTimePredicted() or game.SinglePlayer() then
+        cmd:SetViewAngles(ply:GetSlidingAngle())
+      end
+
+      ply:SetDiveSliding(false)
+      ply:SetSlidingTime(0)
+      ply:SetSliding(false)
+      ply:SetQuickturn(true)
+      ply:SetQuickturnTime(CT)
+      ply:SetQuickturnAng(cmd:GetViewAngles())
+
+      if CLIENT and IsFirstTimePredicted() then
+        DoJumpTurn(false)
+      elseif game.SinglePlayer() then
+        ply:SendLua("DoJumpTurn(false)")
+      end
+
+      ply:SetJumpTurn(true)
+
+      ply:ViewPunch(Angle(2.5, 0, 5))
+
+      ply:SetViewOffsetDucked(Vector(0, 0, 17))
+      ply:SetViewOffset(Vector(0, 0, 64))
+
+      mv:SetOrigin(mv:GetOrigin() + Vector(0, 0, 48))
+      mv:SetVelocity(mv:GetVelocity() * 0.75 + Vector(0, 0, 251))
+    end
+
+    if ply:GetVelocity():Length() <= 75 then
+      ply:SetSlidingTime(0)
+    end
+
+    if ply:GetMelee() ~= 0 then
+      ply:SetSlidingTime(math.max(ply:GetSlidingTime(), CurTime() + 0.1))
+    end
+
+    if ply:GetSlidingTime() < CT and ply:GetMelee() == 0 then
+      ply:SetSliding(false)
+      ply:SetSlidingTime(0)
+      ply:ViewPunch(Angle(0.85, 0, 0.15))
+
+      ply:SetSlidingDelay(CT + 0.1)
+
+      if SERVER then
+        ply.SlideLoopSound:FadeOut(0.15)
+      end
+
+      if (not mv:KeyDown(IN_ATTACK2) or mv:KeyDown(IN_FORWARD)) and not ply:GetDiveSliding() then
+        ply:ConCommand("-duck")
+        ply:SetViewOffsetDucked(Vector(0, 0, 32))
+      elseif not ply:GetDiveSliding() then
+        ply:SetViewOffsetDucked(Vector(0, 0, 17))
+        ply:SetViewOffset(Vector(0, 0, 64))
+        ply:SetJumpTurn(true)
+
+        if CLIENT then
+          DoJumpTurn(false)
+
+          BodyAnim:SetSequence("meslideendprone")
+        elseif game.SinglePlayer() then
+          ply:SendLua("DoJumpTurn(false) BodyAnim:SetSequence('meslideendprone')")
+        end
+      end
+
+      if SERVER and game.SinglePlayer() then
+        net.Start("sliding_spend")
+        net.WriteBool(false)
+        net.WriteBool(slippery)
+        net.WriteBool(ply:GetDiveSliding())
+        net.Send(ply)
+      elseif CLIENT and IsFirstTimePredicted() then
+        SlidingAnimEnd(slippery)
+      end
+
+      ply:SetDiveSliding(false)
+    end
+  end
+
+  sliding = ply:GetSliding()
+
+  if not crouching and not sliding then
+    ply:SetDuckSpeed(ply.OldDuckSpeed)
+    ply:SetUnDuckSpeed(ply.OldUnDuckSpeed)
+  end
+end
+
+local function qslidestep(ply)
+  if not HasSlideGlove(ply) then
+    if nativeQslidestep then return nativeQslidestep(ply) end
+    return
+  end
+
+  if ply:GetSliding() then return true end
+end
+
+local function qslidespeed(ply, cmd)
+  if not HasSlideGlove(ply) then
+    if nativeQslidespeed then return nativeQslidespeed(ply, cmd) end
+    return
+  end
+
+  if ply:GetSliding() then
+    ActuallyHoldingCrouch = cmd:KeyDown(IN_DUCK)
+
+    cmd:RemoveKey(IN_SPEED)
+
+    if not ply:GetSlidingSlippery() then
+      cmd:RemoveKey(IN_JUMP)
+    end
+
+    cmd:ClearMovement()
+
+    local slidetime = math.max(0.1, qslide_duration)
+
+    if (ply:GetSlidingTime() - CurTime()) / slidetime > 0.8 and (ply.SlidingInitTime > CurTime() - 0.25 or ply:GetSlidingSlippery()) then
+      cmd:SetButtons(bit.bor(cmd:GetButtons(), IN_DUCK))
+    end
+  end
+end
+
+hook.Add("SetupMove", "qslide", qslide)
+hook.Add("PlayerFootstep", "qslidestep", qslidestep)
+hook.Add("StartCommand", "qslidespeed", qslidespeed)
