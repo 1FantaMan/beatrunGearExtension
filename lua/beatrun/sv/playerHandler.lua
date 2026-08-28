@@ -1,5 +1,6 @@
 local gearsHandler = include("beatrun/sh/gearsHandler.lua")
 local gearSlots = include("beatrun/sh/gearSlots.lua")
+local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
 local mod = {}
 mod.plys = {}
@@ -105,6 +106,10 @@ function mod.EquipGear(ply, slot, name)
     return false, "the gear '" .. name .. "' is already equipped."
   end
 
+  if gearAdmin.IsDisabled(name) then
+    return false, "'" .. name .. "' has been disabled by an admin."
+  end
+
   if data.gears[slot] ~= "" then
     local oldGear = gearsHandler.GetServerGear(data.gears[slot].name)
     if oldGear and oldGear.destroy then
@@ -116,7 +121,7 @@ function mod.EquipGear(ply, slot, name)
     return false, "'" .. name .. "' gear isnt indentical to the slot: '" .. slot .. "'"
   end
 
-  if mod.GetLevel(ply) < gear.config.level then
+  if mod.GetLevel(ply) < gearAdmin.GetLevel(gear) then
     return false, "'" .. name .. "' gear's level is higher than the player."
   end
 

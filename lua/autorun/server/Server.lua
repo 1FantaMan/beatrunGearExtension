@@ -8,8 +8,10 @@ util.AddNetworkString("BeatrunGearsClientGearChanged")
 util.AddNetworkString("BeatrunGearsClientActivate")
 util.AddNetworkString("BeatrunGearsKeyPress")
 util.AddNetworkString("BeatrunGearsKeyRelease")
+util.AddNetworkString("BeatrunGearsAdminState")
 
 local playerHandler = include("beatrun/sv/playerHandler.lua")
+local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
 local lastClientLevelTime = 0
 
@@ -90,6 +92,75 @@ local function OnClientKeyRelease(_, ply)
   playerHandler.OnGearKeyRelease(ply, slot)
 end
 
+local function conCmdAdminToggle(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil then
+    print("Usage: brgears_admin_toggle <gear>")
+    return
+  end
+
+  gearAdmin.SetDisabled(args[1], not gearAdmin.IsDisabled(args[1]))
+  gearAdmin.Broadcast()
+end
+
+local function conCmdAdminSetLevel(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil or args[2] == nil then
+    print("Usage: brgears_admin_setlevel <gear> <level|default>")
+    return
+  end
+
+  gearAdmin.SetLevelOverride(args[1], args[2] == "default" and nil or tonumber(args[2]))
+  gearAdmin.Broadcast()
+end
+
+local function conCmdAdminSetTuning(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil or args[2] == nil or args[3] == nil then
+    print("Usage: brgears_admin_settuning <gear> <field> <value|default>")
+    return
+  end
+
+  if args[3] == "default" then
+    gearAdmin.ClearTuning(args[1], args[2])
+  else
+    gearAdmin.SetTuning(args[1], args[2], tonumber(args[3]))
+  end
+
+  gearAdmin.Broadcast()
+end
+
+local function conCmdAdminSavePreset(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil then
+    print("Usage: brgears_admin_savepreset <name>")
+    return
+  end
+
+  gearAdmin.SavePreset(args[1])
+end
+
+local function conCmdAdminLoadPreset(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil then
+    print("Usage: brgears_admin_loadpreset <name>")
+    return
+  end
+
+  gearAdmin.LoadPreset(args[1])
+  gearAdmin.Broadcast()
+end
+
+local function conCmdAdminDeletePreset(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+  if args[1] == nil then
+    print("Usage: brgears_admin_deletepreset <name>")
+    return
+  end
+
+  gearAdmin.DeletePreset(args[1])
+end
+
 for _, fileName in ipairs(file.Find("beatrun/cl/*.lua", "LUA")) do
   AddCSLuaFile("beatrun/cl/" .. fileName)
 end
@@ -130,8 +201,15 @@ for _, folderName in ipairs(folders) do
 end
 
 hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", playerHandler.OnPlayerSpawn)
+hook.Add("PlayerInitialSpawn", "BeatrunGearsAdminStateSync", gearAdmin.SendTo)
 net.Receive("BeatrunGearsClientLevel", OnClientLevel)
 net.Receive("BeatrunGearsKeyPress", OnClientKeyPress)
 net.Receive("BeatrunGearsKeyRelease", OnClientKeyRelease)
 concommand.Add("brgears_equip", conCmdEquipGear)
 concommand.Add("brgears_unequip", conCmdUnequipGear)
+concommand.Add("brgears_admin_toggle", conCmdAdminToggle)
+concommand.Add("brgears_admin_setlevel", conCmdAdminSetLevel)
+concommand.Add("brgears_admin_settuning", conCmdAdminSetTuning)
+concommand.Add("brgears_admin_savepreset", conCmdAdminSavePreset)
+concommand.Add("brgears_admin_loadpreset", conCmdAdminLoadPreset)
+concommand.Add("brgears_admin_deletepreset", conCmdAdminDeletePreset)
