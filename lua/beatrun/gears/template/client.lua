@@ -1,7 +1,7 @@
 local mod = {}
 
 function mod.init(ply)
-    return {}
+  return {}
 end
 
 function mod.activate(ply, state)
