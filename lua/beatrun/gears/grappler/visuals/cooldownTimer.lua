@@ -1,7 +1,5 @@
--- receives the grappler's own client.lua module table via mod.Init() instead of calling
--- gearsHandler.GetClientGear("grappler") itself every frame -- include() never caches, so a
--- fresh gearsHandler.GetClientGear call from here would re-include client.lua (which includes
--- this very file), re-registering this hook with zeroed state every single frame forever
+-- receives the grappler's client.lua module table via mod.Init() instead of calling
+-- GetClientGear("grappler") itself - that would re-include client.lua every frame
 local MARGIN = 100
 
 local mod = {}
