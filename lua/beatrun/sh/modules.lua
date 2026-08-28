@@ -1,23 +1,24 @@
--- generic cached loader for beatrun/sh/modules/*.lua - unlike include(), which
--- re-executes the file every call, this includes each module exactly once and
--- hands back the same table on every later Get(), so any state a module keeps
--- (e.g. a cached list) is actually shared across every gear that uses it.
+-- unlike include(), which re-executes every call, this includes each module once and shares the result
+-- across every file that calls Get() -- the cache has to be a true global, not a local upvalue, since
+-- this file itself gets re-executed by include() each time something calls
+-- include("beatrun/sh/modules.lua"), which would otherwise silently create a fresh, disconnected
+-- cache every time and defeat the point for any module with real shared state
+BeatrunGearsModuleCache = BeatrunGearsModuleCache or {}
+
 local mod = {}
 
-local cache = {}
-
 function mod.Get(name)
-    if cache[name] then
-        return cache[name]
-    end
+  if BeatrunGearsModuleCache[name] then
+    return BeatrunGearsModuleCache[name]
+  end
 
-    local path = "beatrun/sh/modules/" .. name .. ".lua"
-    if not file.Exists(path, "LUA") then
-        error("[BeatrunGears] no such module: " .. name)
-    end
+  local path = "beatrun/sh/modules/" .. name .. ".lua"
+  if not file.Exists(path, "LUA") then
+    error("[BeatrunGears] no such module: " .. name)
+  end
 
-    cache[name] = include(path)
-    return cache[name]
+  BeatrunGearsModuleCache[name] = include(path)
+  return BeatrunGearsModuleCache[name]
 end
 
 return mod
