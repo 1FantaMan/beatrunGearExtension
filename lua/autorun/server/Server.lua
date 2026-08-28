@@ -120,6 +120,13 @@ for _, folderName in ipairs(folders) do
       resource.AddSingleFile("sound/beatrun/gears/" .. folderName .. "/" .. fileName)
     end
   end
+
+  for _, ext in ipairs({ "png", "vmt" }) do
+    local materialFiles = file.Find("materials/beatrun/gears/" .. folderName .. "/*." .. ext, "GAME")
+    for _, fileName in ipairs(materialFiles) do
+      resource.AddSingleFile("materials/beatrun/gears/" .. folderName .. "/" .. fileName)
+    end
+  end
 end
 
 hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", playerHandler.OnPlayerSpawn)
