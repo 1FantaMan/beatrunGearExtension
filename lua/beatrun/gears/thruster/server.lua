@@ -82,6 +82,8 @@ function mod.onSetupMove(ply, mv, state)
 
   mv:SetVelocity(vel)
 
+  ParkourEvent("thruster_thrusted", ply, true)
+
   state.phase = "idle"
 end
 

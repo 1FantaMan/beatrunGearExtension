@@ -73,6 +73,7 @@ function mod.activate(ply, state)
   state.pullDelay = math.min(mod.config.max_pull_delay, distance / mod.config.pull_delay_speed)
 
   BroadcastRopeVisual(ply, trace.HitPos, state.arrivalTime)
+  ParkourEvent("grappler_sling", ply, true)
 end
 
 function mod.onSetupMove(ply, mv, state)
@@ -109,6 +110,7 @@ function mod.onSetupMove(ply, mv, state)
   state.phase = "done"
   state.boostTime = CurTime()
   state.waitingForLanding = true
+  ParkourEvent("grappler_hooked", ply, true)
 end
 
 function mod.onParkour(ply, state, action)
