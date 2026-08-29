@@ -36,9 +36,6 @@ end
 
 function mod.activate(ply, state)
   ParkourEvent(throwAnim:GetString(), ply, true)
-
-  local usesRemaining = ply:GetNW2Int("brgear_grapple_uses_remaining", mod.config.max_uses)
-  crosshairProjected.PlayActivationSpin(usesRemaining > 0)
 end
 
 function mod.destroy(ply, state)
