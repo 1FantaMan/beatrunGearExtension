@@ -1,5 +1,5 @@
 -- stacked "uses remaining" HUD, mirrored on the opposite side of the native corner box, one box per equipped gear with config.max_uses set
-local gearsHandler = include("beatrun/sh/gearsHandler.lua")
+local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 local hudStyle = include("beatrun/cl/hudStyle.lua")
 
 surface.CreateFont("BeatrunGearUsesFont", {

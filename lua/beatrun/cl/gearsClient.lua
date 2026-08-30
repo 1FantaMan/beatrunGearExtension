@@ -1,4 +1,4 @@
-local gearsHandler = include("beatrun/sh/gearsHandler.lua")
+local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 
 local clientGears = {}
 
