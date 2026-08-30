@@ -37,6 +37,18 @@ local BOX_GAP = 8
 local MARGIN_X = 20
 local LABEL_PADDING = 16
 
+-- ammo HUDs (PKAD, and GMod's own native one) mirror the corner box into this same right-side band
+-- whenever a real ammo weapon is out, so clear that space instead of overlapping it
+local AMMO_HUD_HEIGHT = 85
+local AMMO_HUD_CLEARANCE_GAP = 10
+
+local function AmmoHudLikelyVisible(ply)
+  if not ply:Alive() then return false end
+
+  local wep = ply:GetActiveWeapon()
+  return IsValid(wep) and wep:GetPrimaryAmmoType() ~= -1
+end
+
 -- matches native HUD.lua's corner-gap fill (cl/HUD.lua:205): a corner-color rect straddling the screen edge
 local function DrawEdgeFill(y, h, cornerColor, vpZ)
   local fillColor = Color(cornerColor.r, cornerColor.g, cornerColor.b, math.Clamp(cornerColor.a + 50, 0, 255))
@@ -55,6 +67,10 @@ hook.Add("HUDPaint", "BeatrunGearsUsesHud", function()
   local w, h = SScaleX(BOX_WIDTH), SScaleY(BOX_HEIGHT)
   local x = ScrW() - MARGIN_X - w + vp.z
   local nextBottom = ScrH() * 0.895 + SScaleY(85) + vp.x
+
+  if AmmoHudLikelyVisible(ply) then
+    nextBottom = nextBottom - SScaleY(AMMO_HUD_HEIGHT + AMMO_HUD_CLEARANCE_GAP)
+  end
 
   for _, slot in ipairs(SLOT_ORDER) do
     local gearName = ply:GetNW2String("brgear_" .. slot, "")
