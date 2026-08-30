@@ -1,5 +1,4 @@
--- the actual slide-speed override lives here; loading it registers the SetupMove/PlayerFootstep/
--- StartCommand hooks (gated per-player on this gear being equipped) once, the first time anyone equips it
+-- slide-speed override lives here; loading it registers its hooks once, the first time anyone equips this gear
 include("beatrun/sh/modules.lua").Get("slideOverride")
 
 local mod = {}

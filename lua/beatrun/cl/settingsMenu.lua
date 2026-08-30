@@ -7,8 +7,7 @@ local KEYBIND_ROWS = {
   { slot = "leg", label = "LEG" },
 }
 
--- VGUI focus inside the context menu's DesktopWindows frames isn't reliable enough for
--- OnKeyCodePressed capture, so key capture is done via a plain key-scan Think hook instead
+-- DesktopWindows VGUI focus isn't reliable for OnKeyCodePressed, so key capture is a plain Think key-scan instead
 local listeningSlot = nil
 local listenStartTime = 0
 local LISTEN_DELAY = 0.25 -- ignore input for a moment so the MOUSE1 click that started listening isn't captured as the bind

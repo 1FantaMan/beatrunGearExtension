@@ -1,5 +1,4 @@
 include("beatrun/gears/grappler/visuals/firstPersonRope.lua")
-local cooldownTimer = include("beatrun/gears/grappler/visuals/cooldownTimer.lua")
 local crosshairProjected = include("beatrun/gears/grappler/visuals/crosshairProjected.lua")
 
 -- meleeairstill = stationary air kick, meleeair = moving/dropkick variant
@@ -7,9 +6,7 @@ local throwAnim = CreateClientConVar("bg_grappler_throw_anim", "meleeairstill", 
 
 local mod = {}
 
--- pass a reference instead of having them call GetClientGear("grappler") themselves - that would
--- re-include() this file every frame
-cooldownTimer.Init(mod)
+-- pass a reference instead of GetClientGear("grappler") calling itself, which would re-include() this file every frame
 crosshairProjected.Init(mod)
 
 function mod.init(ply)

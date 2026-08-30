@@ -6,7 +6,7 @@ return {
   cooldown = 0,
 
   max_uses = 2,
-  min_range = 300,
+  min_range = 500,
   max_range = 1300,
   travel_speed = 1900,
   max_travel_time = 0.15,
@@ -23,7 +23,6 @@ return {
   min_fall_push_penalty = 0.3,
 
   rope_visible_time = 0.3,
-  uses_refill_delay = 0.3,
 
   fire_sound = "beatrun/gears/grappler/Grappler_SE.wav",
 }

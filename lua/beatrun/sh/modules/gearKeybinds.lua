@@ -1,6 +1,4 @@
--- client-only, but lives alongside the other shared modules since beatrun/sh/modules/* is already
--- synced to clients; persists per-slot key overrides so the settings menu and gearBinds.lua's
--- Think poller both read/write the same live table via modules.lua's cache
+-- client-only; persists per-slot key overrides so the settings menu and gearBinds.lua share the same live table
 local mod = {}
 
 local FILE_NAME = "beatrun_gear_keybinds.txt"

@@ -130,8 +130,8 @@ function mod.onTick(ply, state)
 		state.glidePower = mod.config.glide_power_max
 	end
 
-	ply:SetNW2Float("brgear_fins_glidepower", state.glidePower)
-	ply:SetNW2Bool("brgear_fins_gliding", state.isGliding)
+	ply:SetNW2Float("brgear_wingsuit_glidepower", state.glidePower)
+	ply:SetNW2Bool("brgear_wingsuit_gliding", state.isGliding)
 end
 
 function mod.destroy(ply, state)
@@ -148,6 +148,6 @@ function mod.onPlayerSpawn(ply)
 	canGlide(ply, state, false)
 end
 
-hook.Add("PlayerSpawn", "BeatrunGears_fins", mod.onPlayerSpawn)
+hook.Add("PlayerSpawn", "BeatrunGears_wingsuit", mod.onPlayerSpawn)
 
 return mod

@@ -1,15 +1,11 @@
--- ported from the standalone beatrunSlideTweak addon: same qslide/qslidestep/qslidespeed
--- override, but gated per-player on the sglove ("right") gear instead of applying to everyone.
--- players without sglove fall through to Beatrun's own native hook untouched.
+-- ported from the standalone beatrunSlideTweak addon, gated per-player on sglove instead of applying to everyone
 local gearEquip = include("beatrun/sh/modules.lua").Get("gearEquip")
 
 local qslide_duration = 3
 local qslide_speedmult = 1
 local entryCap = math.huge -- whatever speed you enter the slide with carries straight in (native: 541.44)
 
--- this refresh can fire every tick while continuously moving downhill/on a slope; used to be 0.865
--- (a decay) balanced out by the time-based multiplier reapplying ~1.16x on refresh -- now that the
--- time multiplier is gone, this must be 1 (no decay) or speed compounds to zero within a second.
+-- fires every tick on a slope, so this must be 1 (no decay) or speed compounds to zero within a second
 local midSlideDecay = 1
 local midSlideCap = math.huge
 
@@ -240,9 +236,7 @@ local function HasSlideGlove(ply)
   return gearEquip.IsEquipped(ply, "right", "sglove")
 end
 
--- Beatrun's own sh/Sliding.lua registers these under the same hook names; capturing them here
--- (before we overwrite the hook table entries below) lets non-equipped players fall through to
--- unmodified native behavior instead of losing sliding entirely.
+-- captured before we overwrite these hooks so non-equipped players fall through to unmodified native behavior
 local nativeQslide = hook.GetTable().SetupMove and hook.GetTable().SetupMove.qslide
 local nativeQslidestep = hook.GetTable().PlayerFootstep and hook.GetTable().PlayerFootstep.qslidestep
 local nativeQslidespeed = hook.GetTable().StartCommand and hook.GetTable().StartCommand.qslidespeed

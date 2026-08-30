@@ -1,5 +1,4 @@
--- admin-only gear config panel, registered as its own "Beatrun" tab (Server category) in the
--- real spawnmenu (Q menu) -- server re-validates ply:IsAdmin() on every concommand regardless
+-- admin-only gear config panel, its own "Beatrun" tab (Server category) in the spawnmenu; server re-validates IsAdmin() regardless
 local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
 local EXCLUDED_TUNING_FIELDS = { name = true, displayname = true, level = true, type = true }

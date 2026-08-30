@@ -1,6 +1,4 @@
--- server-authoritative gear admin config: disabled gears, level overrides, per-gear tuning, presets.
--- state lives here so both realms can read it; only the server ever mutates + persists it, then
--- broadcasts the full table so clients (gearMenu greying, gear configs) stay in sync
+-- server-authoritative gear admin config (disabled gears, level overrides, tuning, presets); only the server mutates it, then broadcasts to clients
 local gearsHandler = include("beatrun/sh/gearsHandler.lua")
 
 local STATE_FILE = "beatrun_gear_admin_state.txt"
@@ -56,9 +54,7 @@ ApplyAllTuning()
 
 local PRIVILEGE_NAME = "BeatrunGears - Manage Admin Settings"
 
--- CAMI is the shared privilege interface ULX/SAM/serverguard all implement; registering through it
--- (instead of calling ULX's own API) means any of them grants access, and it still falls back to
--- vanilla ply:IsAdmin() when no admin mod is running at all
+-- CAMI is the shared privilege interface ULX/SAM/serverguard implement; falls back to vanilla IsAdmin() if none are running
 if SERVER and CAMI then
   CAMI.RegisterPrivilege({
     Name = PRIVILEGE_NAME,

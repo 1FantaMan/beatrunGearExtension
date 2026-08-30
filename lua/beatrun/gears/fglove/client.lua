@@ -1,5 +1,4 @@
--- disables the native fall-panic camera lock for as long as this gear is equipped, not just during
--- wingsuit gliding (see wingsuit/client.lua, which shares the same refcounted fallLock module)
+-- disables fall-panic camera lock while equipped; shares the refcounted fallLock module with wingsuit/client.lua
 local fallLock = include("beatrun/sh/modules.lua").Get("fallLock")
 
 local mod = {}

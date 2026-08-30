@@ -1,11 +1,12 @@
 local modules = include("beatrun/sh/modules.lua")
-local groundCheck = modules.Get("groundCheck")
 local sound = modules.Get("sound")
 
 local mod = {}
 
+local usesRefill = modules.Get("usesRefill").New(mod, "uses")
+
 function mod.init(ply)
-  return {
+  local state = {
     phase = "idle",
     uses = mod.config.max_uses,
 
@@ -14,6 +15,10 @@ function mod.init(ply)
 
     shared = {}
   }
+
+  usesRefill.Broadcast(ply, state)
+
+  return state
 end
 
 function mod.activate(ply, state)
@@ -45,6 +50,8 @@ function mod.activate(ply, state)
   state.phase = "thrust"
   state.lastUsed = CurTime()
   state.uses = math.max(0, state.uses - 1)
+  usesRefill.Broadcast(ply, state)
+  usesRefill.StartWaiting(state)
 end
 
 function mod.onSetupMove(ply, mv, state)
@@ -69,9 +76,7 @@ function mod.onSetupMove(ply, mv, state)
   end
 
   if speed > mod.config.dash_max_speed then
-    -- already faster than the dash would redirect to; keep current velocity and floor the vertical
-    -- speed (scaled up with current speed) instead of adding on top, which barely registers if
-    -- you're already falling fast
+    -- already faster than the dash would redirect to; floor the vertical speed instead of adding on top
     vel.z = math.max(vel.z, mod.config.jump_power + speed * mod.config.jump_power_scale)
   else
     local dash = look * dashSpeed
@@ -88,21 +93,15 @@ function mod.onSetupMove(ply, mv, state)
 end
 
 function mod.onParkour(ply, state, action)
-  if action ~= "land" then
-    return
-  end
-
-  if not groundCheck.IsRealGround(ply) then
-    return
-  end
-
-  state.uses = mod.config.max_uses
+  usesRefill.OnParkour(ply, state, action)
 end
 
 function mod.onTick(ply, state)
   if not ply:IsOnGround() and ply:GetWasOnGround() then
     state.airStartTime = CurTime()
   end
+
+  usesRefill.OnTick(ply, state)
 end
 
 function mod.destroy(ply, state)
@@ -117,6 +116,7 @@ function mod.OnPlayerSpawn(ply)
   state.uses = mod.config.max_uses
   state.lastUsed = CurTime()
   state.airStartTime = 0
+  usesRefill.Broadcast(ply, state)
 end
 
 hook.Add("PlayerSpawn", "BeatrunGears_Thruster", mod.OnPlayerSpawn)

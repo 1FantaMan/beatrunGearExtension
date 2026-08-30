@@ -1,5 +1,4 @@
--- shared "spin 180 degrees, optionally fade out" animation. Each caller owns its own state
--- table via New(); this module holds no state itself.
+-- shared "spin 180 degrees, optionally fade out" animation; each caller owns its own state via New()
 local mod = {}
 
 local SPIN_DURATION = 0.35

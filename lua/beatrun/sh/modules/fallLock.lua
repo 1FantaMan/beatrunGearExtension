@@ -1,7 +1,4 @@
--- client-only; centralizes disabling cl/Fall.lua's native "FallLock" hook (which zeroes mouse
--- input entirely during fast falls) so multiple gears (wingsuit, fglove) can each ask for it to be
--- disabled without fighting over the same cached hook function -- stays off as long as anything
--- wants it off, restored only once everyone releases it
+-- client-only; ref-counted disable of native FallLock (zeroes mouse input on fast falls) so multiple gears can share it without fighting
 local mod = {}
 
 local cachedFn

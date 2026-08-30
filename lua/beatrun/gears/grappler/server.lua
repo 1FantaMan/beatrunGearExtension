@@ -1,9 +1,10 @@
 local modules = include("beatrun/sh/modules.lua")
-local groundCheck = modules.Get("groundCheck")
 local sound = modules.Get("sound")
 local movement = modules.Get("movement")
 
 local mod = {}
+
+local usesRefill = modules.Get("usesRefill").New(mod, "usesRemaining")
 
 local function PlayFireSound(ply)
   sound.Play(ply, mod.config.fire_sound, 90, 100)
@@ -17,16 +18,19 @@ local function BroadcastRopeVisual(ply, targetPos, arrivalTime)
 end
 
 function mod.init(ply)
-  return {
+  local state = {
     phase = "idle",
     targetPos = nil,
     arrivalTime = 0,
     pullDelay = 0,
     boostTime = 0,
     waitingForLanding = false,
-    landedTime = nil,
     usesRemaining = mod.config.max_uses,
   }
+
+  usesRefill.Broadcast(ply, state)
+
+  return state
 end
 
 function mod.activate(ply, state)
@@ -55,12 +59,9 @@ function mod.activate(ply, state)
   movement.CancelAbilities(ply)
 
   state.usesRemaining = state.usesRemaining - 1
-  ply:SetNW2Int("brgear_grapple_uses_remaining", state.usesRemaining)
+  usesRefill.Broadcast(ply, state)
 
   PlayFireSound(ply)
-
-  debugoverlay.Line(startPos, trace.HitPos, 2, Color(0, 255, 0))
-  debugoverlay.Cross(trace.HitPos, 10, 2, Color(255, 0, 0))
 
   ply:ViewPunch(Angle(2, 5, 0))
 
@@ -109,15 +110,12 @@ function mod.onSetupMove(ply, mv, state)
 
   state.phase = "done"
   state.boostTime = CurTime()
-  state.waitingForLanding = true
+  usesRefill.StartWaiting(state)
   ParkourEvent("grappler_hooked", ply, true)
 end
 
 function mod.onParkour(ply, state, action)
-  if action ~= "land" or not state.waitingForLanding then return end
-  if not groundCheck.IsRealGround(ply) then return end
-  state.waitingForLanding = false
-  state.landedTime = CurTime()
+  usesRefill.OnParkour(ply, state, action)
 end
 
 function mod.onTick(ply, state)
@@ -126,16 +124,7 @@ function mod.onTick(ply, state)
     ply:SetNW2Bool("brgear_grapple_active", false)
   end
 
-  if state.waitingForLanding and groundCheck.IsRealGround(ply) then
-    state.waitingForLanding = false
-    state.landedTime = CurTime()
-  end
-
-  if state.landedTime and CurTime() - state.landedTime >= mod.config.uses_refill_delay then
-    state.usesRemaining = mod.config.max_uses
-    state.landedTime = nil
-    ply:SetNW2Int("brgear_grapple_uses_remaining", state.usesRemaining)
-  end
+  usesRefill.OnTick(ply, state)
 end
 
 function mod.destroy(ply, state)

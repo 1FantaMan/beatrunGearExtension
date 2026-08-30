@@ -14,7 +14,7 @@ local FALL_EVENTS_TO_REDIRECT = {
 hook.Add("OnParkour", "BeatrunGears_WingsuitDiveOverride", function(event, ply)
   if not FALL_EVENTS_TO_REDIRECT[event] then return end
   if not IsValid(ply) or ply ~= LocalPlayer() then return end
-  if not ply:GetNW2Bool("brgear_fins_gliding", false) then return end
+  if not ply:GetNW2Bool("brgear_wingsuit_gliding", false) then return end
 
   ParkourEvent("divestart", ply, true)
 
@@ -34,12 +34,12 @@ end
 function mod.destroy(ply, state)
 end
 
-hook.Add("HUDPaint", "BeatrunGears_FinsHUD", function()
+hook.Add("HUDPaint", "BeatrunGears_WingsuitHUD", function()
   local ply = LocalPlayer()
   if not IsValid(ply) then return end
   if ply:GetNW2String("brgear_back", "") ~= "wingsuit" then return end
 
-  local power = ply:GetNW2Float("brgear_fins_glidepower", 0)
+  local power = ply:GetNW2Float("brgear_wingsuit_glidepower", 0)
   local frac = math.Clamp(power / mod.config.glide_power_max, 0, 1)
 
   -- replicate Beatrun's own bgpadding calc (cl/HUD.lua) so our box matches the native one's actual width, not just its minimum
@@ -72,7 +72,7 @@ hook.Add("Think", "BeatrunGears_FinsGlideWatch", function()
   local ply = LocalPlayer()
   if not IsValid(ply) then return end
 
-  local isGliding = ply:GetNW2Bool("brgear_fins_gliding", false)
+  local isGliding = ply:GetNW2Bool("brgear_wingsuit_gliding", false)
 
   if isGliding and not wasGliding then
     fallLock.Disable()
