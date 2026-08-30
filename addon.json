@@ -1,0 +1,12 @@
+{
+	"title": "Beatrun Gear Extension",
+	"type": "tool",
+	"tags": [ "fun" ],
+	"ignore":
+	[
+		"*.psd",
+		"*.xcf",
+		"*.blend",
+		"*.git*"
+	]
+}
