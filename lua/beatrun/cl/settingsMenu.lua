@@ -1,5 +1,8 @@
 local gearSlots = include("beatrun/sh/gearSlots.lua")
 local keybinds = include("beatrun/sh/modules.lua").Get("gearKeybinds")
+-- side-effect only: guarantees the rope color convars exist even if grappler's own client.lua
+-- (which normally registers them) hasn't loaded yet - guarded internally, safe to include again
+include("beatrun/gears/grappler/visuals/ropeColor.lua")
 
 local KEYBIND_ROWS = {
   { slot = "left", label = "LEFT ARM" },
@@ -121,6 +124,26 @@ local function main(icon, window)
 
   for _, entry in ipairs(KEYBIND_ROWS) do
     AddKeybindRow(entry.slot, entry.label)
+  end
+
+  AddSectionHeader("GRAPPLE ROPE COLOR")
+
+  local mixer = vgui.Create("DColorMixer", listPanel)
+  mixer:Dock(TOP)
+  mixer:SetTall(200)
+  mixer:DockMargin(0, 0, 0, 10)
+  mixer:SetPalette(false)
+  mixer:SetAlphaBar(false)
+  mixer:SetWangs(true)
+  mixer:SetColor(Color(
+    GetConVar("brgears_grappler_rope_r"):GetInt(),
+    GetConVar("brgears_grappler_rope_g"):GetInt(),
+    GetConVar("brgears_grappler_rope_b"):GetInt()
+  ))
+  mixer.ValueChanged = function(_, color)
+    RunConsoleCommand("brgears_grappler_rope_r", math.Round(color.r))
+    RunConsoleCommand("brgears_grappler_rope_g", math.Round(color.g))
+    RunConsoleCommand("brgears_grappler_rope_b", math.Round(color.b))
   end
 end
 
