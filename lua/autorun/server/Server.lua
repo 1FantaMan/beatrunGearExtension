@@ -138,6 +138,7 @@ local function conCmdAdminSavePreset(ply, cmd, args)
   end
 
   gearAdmin.SavePreset(args[1])
+  gearAdmin.Broadcast()
 end
 
 local function conCmdAdminLoadPreset(ply, cmd, args)
@@ -159,6 +160,14 @@ local function conCmdAdminDeletePreset(ply, cmd, args)
   end
 
   gearAdmin.DeletePreset(args[1])
+  gearAdmin.Broadcast()
+end
+
+local function conCmdAdminResetDefault(ply, cmd, args)
+  if not gearAdmin.CanManage(ply) then return end
+
+  gearAdmin.ResetToDefault()
+  gearAdmin.Broadcast()
 end
 
 for _, fileName in ipairs(file.Find("beatrun/cl/*.lua", "LUA")) do
@@ -213,3 +222,4 @@ concommand.Add("brgears_admin_settuning", conCmdAdminSetTuning)
 concommand.Add("brgears_admin_savepreset", conCmdAdminSavePreset)
 concommand.Add("brgears_admin_loadpreset", conCmdAdminLoadPreset)
 concommand.Add("brgears_admin_deletepreset", conCmdAdminDeletePreset)
+concommand.Add("brgears_admin_resetdefault", conCmdAdminResetDefault)

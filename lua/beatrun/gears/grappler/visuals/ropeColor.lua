@@ -2,7 +2,7 @@
 local mod = {}
 
 local function EnsureConVar(name, default, help, min, max)
-  return GetConVar(name) or CreateClientConVar(name, default, true, false, help, min, max)
+  return CreateClientConVar(name, default, true, false, help, min, max)
 end
 
 local r = EnsureConVar("brgears_grappler_rope_r", "0", "Grappler rope color - red (0-255)", 0, 255)
