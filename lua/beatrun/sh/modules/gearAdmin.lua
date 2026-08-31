@@ -1,5 +1,5 @@
 -- server-authoritative gear admin config (disabled gears, level overrides, tuning, presets); only the server mutates it, then broadcasts to clients
-local gearsHandler = include("beatrun/sh/gearsHandler.lua")
+local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 
 local STATE_FILE = "beatrun_gear_admin_state.txt"
 local PRESETS_FILE = "beatrun_gear_admin_presets.txt"
@@ -34,13 +34,22 @@ local function GetGear(name)
   return SERVER and gearsHandler.GetServerGear(name) or gearsHandler.GetClientGear(name)
 end
 
+-- always resets to the pristine defaultConfig first, then layers current overrides on top - so
+-- clearing an override (or switching to a state that no longer has one) actually reverts it,
+-- instead of leaving the field stuck at whatever it was last tuned to
 local function ApplyTuning(name)
   local gear = GetGear(name)
-  local overrides = mod.state.tuning[name]
-  if not gear or not overrides then return end
+  if not gear then return end
 
-  for field, value in pairs(overrides) do
+  for field, value in pairs(gear.defaultConfig) do
     gear.config[field] = value
+  end
+
+  local overrides = mod.state.tuning[name]
+  if overrides then
+    for field, value in pairs(overrides) do
+      gear.config[field] = value
+    end
   end
 end
 
@@ -111,14 +120,32 @@ function mod.SavePreset(presetName)
   SavePresets()
 end
 
+-- reapplies every gear tuned by either the old or new state, not just the new one, so a gear
+-- that had an override before but doesn't in the loaded preset actually reverts to default
+local function ApplyTuningDiff(previousTuning)
+  local names = {}
+  for name in pairs(previousTuning) do names[name] = true end
+  for name in pairs(mod.state.tuning) do names[name] = true end
+  for name in pairs(names) do ApplyTuning(name) end
+end
+
 function mod.LoadPreset(presetName)
   local preset = mod.presets[presetName]
   if not preset then return false end
 
+  local previousTuning = mod.state.tuning
   mod.state = DeepCopy(preset)
   SaveState()
-  ApplyAllTuning()
+  ApplyTuningDiff(previousTuning)
+
   return true
+end
+
+function mod.ResetToDefault()
+  local previousTuning = mod.state.tuning
+  mod.state = NewState()
+  SaveState()
+  ApplyTuningDiff(previousTuning)
 end
 
 function mod.DeletePreset(presetName)
@@ -153,11 +180,17 @@ if SERVER then
 else
   mod.presetNames = {}
 
+  -- gearAdminMenu.lua sets this to rebuild itself whenever fresh state actually arrives, instead
+  -- of guessing a fixed delay after sending a concommand
+  mod.OnStateUpdated = nil
+
   net.Receive("BeatrunGearsAdminState", function()
     local payload = util.JSONToTable(net.ReadString())
     mod.state = payload.state
     mod.presetNames = payload.presetNames
     ApplyAllTuning()
+
+    if mod.OnStateUpdated then mod.OnStateUpdated() end
   end)
 end
 
