@@ -1,6 +1,7 @@
-local gearsHandler = include("beatrun/sh/gearsHandler.lua")
+local modules = include("beatrun/sh/modules.lua")
+local gearsHandler = modules.Get("gearsHandler")
 local gearSlots = include("beatrun/sh/gearSlots.lua")
-local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
+local gearAdmin = modules.Get("gearAdmin")
 
 local mod = {}
 mod.plys = {}
