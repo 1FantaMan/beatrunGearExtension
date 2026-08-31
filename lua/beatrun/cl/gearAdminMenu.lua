@@ -2,6 +2,8 @@
 local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
 local EXCLUDED_TUNING_FIELDS = { name = true, displayname = true, level = true, type = true }
+local DEFAULT_PRESET_NAME = "Default" -- reserved, not a real saved preset - resets everything via brgears_admin_resetdefault
+local lastSelectedPreset = DEFAULT_PRESET_NAME -- persists across BuildPanel rebuilds, so selection survives a Load/Delete/Save
 
 local function DefaultConfig(folder)
   return include("beatrun/gears/" .. folder .. "/config.lua")
@@ -31,14 +33,18 @@ local function BuildPanel(panel)
   local presetCombo = vgui.Create("DComboBox", presetRow)
   presetCombo:Dock(LEFT)
   presetCombo:SetWide(150)
+  presetCombo:AddChoice(DEFAULT_PRESET_NAME, nil, lastSelectedPreset == DEFAULT_PRESET_NAME)
   for _, name in ipairs(gearAdmin.presetNames) do
-    presetCombo:AddChoice(name)
+    presetCombo:AddChoice(name, nil, lastSelectedPreset == name)
+  end
+  presetCombo.OnSelect = function(_, _, value)
+    lastSelectedPreset = value
   end
 
-  local function RefreshLater()
-    timer.Simple(0.1, function()
-      if IsValid(panel) then BuildPanel(panel) end
-    end)
+  -- rebuilds this panel the moment fresh state actually arrives from the server, rather than
+  -- guessing a fixed delay after sending a concommand (which could rebuild before it lands)
+  gearAdmin.OnStateUpdated = function()
+    if IsValid(panel) then BuildPanel(panel) end
   end
 
   local loadBtn = vgui.Create("DButton", presetRow)
@@ -47,10 +53,13 @@ local function BuildPanel(panel)
   loadBtn:DockMargin(4, 0, 0, 0)
   loadBtn:SetWide(50)
   loadBtn.DoClick = function()
-    local _, name = presetCombo:GetSelected()
+    local name = presetCombo:GetSelected()
     if not name or name == "" then return end
-    RunConsoleCommand("brgears_admin_loadpreset", name)
-    RefreshLater()
+    if name == DEFAULT_PRESET_NAME then
+      RunConsoleCommand("brgears_admin_resetdefault")
+    else
+      RunConsoleCommand("brgears_admin_loadpreset", name)
+    end
   end
 
   local deleteBtn = vgui.Create("DButton", presetRow)
@@ -59,10 +68,9 @@ local function BuildPanel(panel)
   deleteBtn:DockMargin(4, 0, 0, 0)
   deleteBtn:SetWide(50)
   deleteBtn.DoClick = function()
-    local _, name = presetCombo:GetSelected()
-    if not name or name == "" then return end
+    local name = presetCombo:GetSelected()
+    if not name or name == "" or name == DEFAULT_PRESET_NAME then return end
     RunConsoleCommand("brgears_admin_deletepreset", name)
-    RefreshLater()
   end
 
   local saveRow = vgui.Create("DPanel", panel)
@@ -82,9 +90,8 @@ local function BuildPanel(panel)
   saveBtn:SetWide(50)
   saveBtn.DoClick = function()
     local name = presetNameEntry:GetValue()
-    if name == "" then return end
+    if name == "" or name == DEFAULT_PRESET_NAME then return end
     RunConsoleCommand("brgears_admin_savepreset", name)
-    RefreshLater()
   end
 
   panel:Help(" ")
@@ -152,7 +159,6 @@ local function BuildPanel(panel)
     levelResetBtn:SetWide(45)
     levelResetBtn.DoClick = function()
       RunConsoleCommand("brgears_admin_setlevel", folder, "default")
-      RefreshLater()
     end
 
     local tuningRowCount = 2
@@ -167,6 +173,9 @@ local function BuildPanel(panel)
 
       local overrides = gearAdmin.state.tuning[folder]
       local current = (overrides and overrides[field] ~= nil) and overrides[field] or defaults[field]
+      if field == "max_uses" then
+        print("[gearAdminMenu DEBUG]", folder, field, "overrides=", overrides and overrides[field], "defaults[field]=", defaults[field], "-> current=", current)
+      end
 
       local wang = vgui.Create("DNumberWang", row)
       wang:Dock(LEFT)
@@ -186,7 +195,6 @@ local function BuildPanel(panel)
       resetBtn:SetWide(45)
       resetBtn.DoClick = function()
         RunConsoleCommand("brgears_admin_settuning", folder, field, "default")
-        RefreshLater()
       end
     end
 
