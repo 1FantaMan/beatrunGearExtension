@@ -1,0 +1,5 @@
+2026-09-02 Make Gears Unusable while Typing (like in chat and while being in interface) +General @bug
+2026-09-02 Make Gears Unusable while Driving +General @bug
+2026-09-02 Fix issue with the grappler causing lag with a reflection surface +LeftArm @bug
+(A) 2026-09-02 Add prediction to gears +General @feature
+2026-09-02 Make the grappler's crosshair hidden while aiming +LeftArm @feature
