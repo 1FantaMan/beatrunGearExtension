@@ -2,6 +2,8 @@ local modules = include("beatrun/sh/modules.lua")
 local sound = modules.Get("sound")
 local movement = modules.Get("movement")
 
+local shared = include("beatrun/gears/grappler/shared.lua")
+
 local mod = {}
 
 local usesRefill = modules.Get("usesRefill").New(mod, "usesRemaining")
@@ -17,7 +19,6 @@ local function BroadcastRopeVisual(ply, state, targetPos)
 	ply:SetNW2Float("brgear_grapple_arrival_time", state.arrivalTime)
 	ply:SetNW2Float("brgear_grapple_pull_delay", state.pullDelay)
 end
-
 
 function mod.init(ply)
 	local state = {
@@ -98,18 +99,9 @@ function mod.onSetupMove(ply, mv, state)
 		end
 	end
 
-	local direction = (state.targetPos - ply:EyePos()):GetNormalized()
-	local currentSpeed = mv:GetVelocity():Length()
-	local boostSpeed = math.min(mod.config.push_max_speed,
-		math.max(mod.config.push_speed, currentSpeed * mod.config.push_speed_multiplier))
-
-	if fallSpeed > mod.config.fall_damage_threshold then
-		local excess = fallSpeed - mod.config.fall_damage_threshold
-		local penalty = math.max(mod.config.min_fall_push_penalty, 1 - excess * mod.config.fall_push_penalty_scale)
-		boostSpeed = boostSpeed * penalty
-	end
-
-	mv:SetVelocity(direction * boostSpeed)
+	local direction =  (state.targetPos - ply:EyePos()):GetNormalized()
+	local vel = mv:GetVelocity():Length()
+	mv:SetVelocity(shared.ComputePushVelocity(direction, vel, fallSpeed, mod.config))
 
 	state.phase = "done"
 	state.boostTime = CurTime()
