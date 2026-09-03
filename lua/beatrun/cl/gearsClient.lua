@@ -2,7 +2,8 @@ local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 
 local RECONCILE_WINDOW = 0.5
 
-clientGears = {}
+BeatrunGearsClientGears = BeatrunGearsClientGears or {}
+local clientGears = BeatrunGearsClientGears
 
 local function OnGearChange()
 	local slot = net.ReadString()
