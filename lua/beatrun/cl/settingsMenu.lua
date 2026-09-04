@@ -10,6 +10,17 @@ local KEYBIND_ROWS = {
 	{ slot = "leg",  label = "LEG" },
 }
 
+local SCROLLER_ROWS = {
+	{
+		convar = "brgears_screenshake_scale",
+		label = "Screen Shake",
+		min = 0,
+		max = 5,
+		decimals = 2,
+		default = 1,
+	},
+}
+
 -- DesktopWindows VGUI focus isn't reliable for OnKeyCodePressed, so key capture is a plain Think key-scan instead
 local listeningSlot = nil
 local listenStartTime = 0
@@ -27,6 +38,87 @@ local function ScanForKeyPress()
 	end
 
 	return nil
+end
+
+local function KeySlots(listPanel)
+	local function AddKeybindRow(slotName, label)
+		local defaultKey = gearSlots.SLOTS[slotName].defaultKey
+
+		local row = vgui.Create("DButton", listPanel)
+		row:SetText("")
+		row:Dock(TOP)
+		row:SetTall(30)
+		row:DockMargin(0, 0, 0, 1)
+
+		row.Paint = function(self, w, h)
+			local listening = listeningSlot == slotName
+
+			surface.SetDrawColor(0, 0, 0, 120)
+			surface.DrawRect(0, 0, w, h)
+
+			surface.SetFont("BeatrunGearMenuFont")
+			surface.SetTextColor(color_white)
+			surface.SetTextPos(10, 6)
+			surface.DrawText(label)
+
+			local rightText = listening and "PRESS A KEY..." or
+				(input.GetKeyName(keybinds.Get(slotName, defaultKey)) or "UNBOUND")
+			local tw = surface.GetTextSize(rightText)
+			surface.SetTextColor(listening and Color(255, 210, 90) or Color(180, 180, 180))
+			surface.SetTextPos(w - tw - 10, 6)
+			surface.DrawText(rightText)
+		end
+
+		row.DoClick = function()
+			listeningSlot = slotName
+			listenStartTime = CurTime()
+		end
+	end
+
+	for _, entry in ipairs(KEYBIND_ROWS) do
+		AddKeybindRow(entry.slot, entry.label)
+	end
+end
+
+local function GrapplerRopeColorer(listPanel)
+	local mixer = vgui.Create("DColorMixer", listPanel)
+	mixer:Dock(TOP)
+	mixer:SetTall(200)
+	mixer:DockMargin(0, 0, 0, 10)
+	mixer:SetPalette(false)
+	mixer:SetAlphaBar(false)
+	mixer:SetWangs(true)
+	mixer:SetColor(Color(
+		GetConVar("brgears_grappler_rope_r"):GetInt(),
+		GetConVar("brgears_grappler_rope_g"):GetInt(),
+		GetConVar("brgears_grappler_rope_b"):GetInt()
+	))
+	mixer.ValueChanged = function(_, color)
+		RunConsoleCommand("brgears_grappler_rope_r", math.Round(color.r))
+		RunConsoleCommand("brgears_grappler_rope_g", math.Round(color.g))
+		RunConsoleCommand("brgears_grappler_rope_b", math.Round(color.b))
+	end
+end
+
+local function Sliders(listPanel)
+	local function AddSliderRow(entry)
+		local slider = vgui.Create("DNumSlider", listPanel)
+		slider:Dock(TOP)
+		slider:SetTall(30)
+		slider:DockMargin(0, 0, 0, 1)
+		slider:SetText(entry.label)
+		slider:SetMin(entry.min)
+		slider:SetMax(entry.max)
+		slider:SetDecimals(entry.decimals)
+		slider:SetValue(GetConVar(entry.convar):GetFloat())
+		slider.OnValueChanged = function(_, value)
+			RunConsoleCommand(entry.convar, value)
+		end
+	end
+
+	for _, entry in ipairs(SCROLLER_ROWS) do
+		AddSliderRow(entry)
+	end
 end
 
 hook.Add("Think", "BeatrunGears_SettingsKeyCapture", function()
@@ -87,65 +179,14 @@ local function main(icon, window)
 		header:DockMargin(0, 10, 0, 2)
 	end
 
-	local function AddKeybindRow(slotName, label)
-		local defaultKey = gearSlots.SLOTS[slotName].defaultKey
-
-		local row = vgui.Create("DButton", listPanel)
-		row:SetText("")
-		row:Dock(TOP)
-		row:SetTall(30)
-		row:DockMargin(0, 0, 0, 1)
-
-		row.Paint = function(self, w, h)
-			local listening = listeningSlot == slotName
-
-			surface.SetDrawColor(0, 0, 0, 120)
-			surface.DrawRect(0, 0, w, h)
-
-			surface.SetFont("BeatrunGearMenuFont")
-			surface.SetTextColor(color_white)
-			surface.SetTextPos(10, 6)
-			surface.DrawText(label)
-
-			local rightText = listening and "PRESS A KEY..." or
-			(input.GetKeyName(keybinds.Get(slotName, defaultKey)) or "UNBOUND")
-			local tw = surface.GetTextSize(rightText)
-			surface.SetTextColor(listening and Color(255, 210, 90) or Color(180, 180, 180))
-			surface.SetTextPos(w - tw - 10, 6)
-			surface.DrawText(rightText)
-		end
-
-		row.DoClick = function()
-			listeningSlot = slotName
-			listenStartTime = CurTime()
-		end
-	end
-
 	AddSectionHeader("KEYBINDS")
+	KeySlots(listPanel)
 
-	for _, entry in ipairs(KEYBIND_ROWS) do
-		AddKeybindRow(entry.slot, entry.label)
-	end
+	AddSectionHeader("SCROLLERS")
+	Sliders(listPanel)
 
 	AddSectionHeader("GRAPPLE ROPE COLOR")
-
-	local mixer = vgui.Create("DColorMixer", listPanel)
-	mixer:Dock(TOP)
-	mixer:SetTall(200)
-	mixer:DockMargin(0, 0, 0, 10)
-	mixer:SetPalette(false)
-	mixer:SetAlphaBar(false)
-	mixer:SetWangs(true)
-	mixer:SetColor(Color(
-		GetConVar("brgears_grappler_rope_r"):GetInt(),
-		GetConVar("brgears_grappler_rope_g"):GetInt(),
-		GetConVar("brgears_grappler_rope_b"):GetInt()
-	))
-	mixer.ValueChanged = function(_, color)
-		RunConsoleCommand("brgears_grappler_rope_r", math.Round(color.r))
-		RunConsoleCommand("brgears_grappler_rope_g", math.Round(color.g))
-		RunConsoleCommand("brgears_grappler_rope_b", math.Round(color.b))
-	end
+	GrapplerRopeColorer(listPanel)
 end
 
 list.Set("DesktopWindows", "BeatrunSettingsMenu", {
