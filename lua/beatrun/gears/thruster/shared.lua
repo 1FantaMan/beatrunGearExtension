@@ -8,7 +8,7 @@ local mod = {}
 local usesRefill = util.usesRefill.New(mod, "uses")
 
 -- EXPERIMENT (ease-in dash velocity): tune/remove this if it doesn't feel right; REVERT by deleting this constant too
-local DASH_EASE_DURATION = 0.12
+local DASH_EASE_DURATION = 0.08
 
 function mod.GetStates(config)
 	return {

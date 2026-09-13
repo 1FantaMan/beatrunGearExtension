@@ -9,9 +9,6 @@ local mod = {}
 
 local usesRefill = gearUtil.usesRefill.New(mod, "usesRemaining")
 
--- EXPERIMENT (ease-in pull velocity): tune/remove this if it doesn't feel right; REVERT by deleting this constant too
-local PULL_EASE_DURATION = 0.12
-
 local DOOR_CLASSES = {
 	["func_door_rotating"] = true,
 	["prop_door_rotating"] = true,
@@ -37,7 +34,6 @@ function mod.GetStates(config)
 		boostTime = 0,
 		waitingForLanding = false,
 		usesRemaining = config.max_uses,
-		pulling = false, -- EXPERIMENT (ease-in pull velocity): REVERT by deleting this field
 	}
 
 	return state
@@ -86,23 +82,6 @@ function mod.onSetupMove(ply, mv, state)
 	local config = mod.config
 
 	usesRefill.OnTick(ply, state)
-
-	-- EXPERIMENT (ease-in pull velocity): this whole block is new. REVERT by deleting it entirely and moving
-	-- `mv:SetVelocity(mod.ComputePushVelocity(direction, speed, fallSpeed, config))` back to run instantly where
-	-- the arrival block sets state.pulling below (see the matching EXPERIMENT comment further down in this function).
-	-- Chases the engine's own live velocity toward the target instead of overriding it outright each tick, so
-	-- gravity/collision this tick still apply naturally and we only nudge the result - less fighting the physics step.
-	if state.pulling then
-		local elapsed = CurTime() - state.pullStartTime
-
-		if elapsed >= PULL_EASE_DURATION then
-			mv:SetVelocity(state.pullTargetVelocity)
-			state.pulling = false
-		else
-			local chaseT = math.Clamp(FrameTime() / PULL_EASE_DURATION, 0, 1)
-			mv:SetVelocity(LerpVector(chaseT, mv:GetVelocity(), state.pullTargetVelocity))
-		end
-	end
 
 	if state.phase == "done" and CurTime() - state.boostTime >= config.rope_visible_time then
 		state.phase = "idle"
@@ -159,13 +138,7 @@ function mod.onSetupMove(ply, mv, state)
 
 		local direction = (state.targetPos - ply:EyePos()):GetNormalized()
 		local speed = mv:GetVelocity():Length()
-
-		-- EXPERIMENT (ease-in pull velocity): REPLACES the old instant
-		-- `mv:SetVelocity(mod.ComputePushVelocity(direction, speed, fallSpeed, config))` call. REVERT by deleting
-		-- these 2 lines and putting that call back here.
-		state.pulling = true
-		state.pullStartTime = CurTime()
-		state.pullTargetVelocity = mod.ComputePushVelocity(direction, speed, fallSpeed, config)
+		mv:SetVelocity(mod.ComputePushVelocity(direction, speed, fallSpeed, config))
 
 		state.phase = "done"
 		state.boostTime = CurTime()
