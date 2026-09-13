@@ -1,4 +1,4 @@
-local gearEquip = include("beatrun/sh/modules.lua").Get("gearEquip")
+local gearEquip = include("beatrun/sh/util.lua").gearEquip
 
 local mod = {}
 

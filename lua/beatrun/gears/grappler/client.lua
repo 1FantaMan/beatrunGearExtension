@@ -1,69 +1,47 @@
 include("beatrun/gears/grappler/visuals/firstPersonRope.lua")
 local crosshairProjected = include("beatrun/gears/grappler/visuals/crosshairProjected.lua")
-local movement = include("beatrun/sh/modules.lua").Get("movement")
+local util = include("beatrun/sh/util.lua")
 
 local shared = include("beatrun/gears/grappler/shared.lua")
 
 local mod = {}
 
-crosshairProjected.Init(mod)
-
-function mod.init(ply)
-	return {}
-end
-
 function mod.GetHookPosition(ply)
 	local startPos = ply:EyePos()
 	local dir = ply:EyeAngles():Forward()
 
-	local trace = util.TraceLine({
-		start = startPos,
-		endpos = startPos + dir * mod.config.max_range,
-		filter = ply
-	})
+	local trace = shared.ComputeGrapplerRaycast(ply, startPos, dir, mod.config)
 
-	if trace.Hit then
+	if trace then
 		return trace.HitPos, true
 	end
 
 	return startPos + dir * mod.config.max_range, false
 end
 
-function mod.canActivate(ply, state)
-	if ply:GetNW2Int("brgear_left_uses", mod.config.max_uses) <= 0 then return false end
-	if ply:GetNW2Bool("brgear_grapple_active", false) then return false end
+crosshairProjected.Init(mod)
 
-	local _, reachable = mod.GetHookPosition(ply)
-	return reachable
-end
+util.RegisterSafeAnim("grapple_throw", {
+	model = "beatrun/gears/grappler/anims/grappler_arms",
+})
 
-function mod.activate(ply, state)
-	movement.CancelAbilities(ply)
-	ParkourEvent("meleeairstill", ply, true)
-end
+-- fraction of the pull sequence's full length to play before cutting back to idle; tune by feel
+local PULL_TRANSITION_CYCLE = 0.25
 
-function mod.onSetupMove(ply, mv, state)
-	if not ply:GetNW2Bool("brgear_grapple_active", false) then
-		state.appliedThisFire = nil
-		return
-	end
+local pullData = {
+	model = "beatrun/gears/grappler/anims/grappler_arms",
+	fallbackEvent = false, -- "jumpstill" is a floating pose; go straight back to normal idle/walk instead
+	transitioncheck = function(ply)
+		return BodyAnimCycle >= PULL_TRANSITION_CYCLE
+	end,
+}
 
-	local fireTime = ply:GetNW2Float("brgear_grapple_fire_time", 0)
-	if state.lastSeenFireTime ~= fireTime then
-		state.lastSeenFireTime = fireTime
-		state.appliedThisFire = false
-	end
+-- grounded pull keeps the old arms-only anim; the fullbody one's leg motion looks like floating while grounded
+util.RegisterSafeAnim("grapple_pull", pullData)
+util.RegisterSafeAnim("grapple_pull_air", pullData)
 
-	if state.appliedThisFire then return end
-
-	local arrivalTime = ply:GetNW2Float("brgear_grapple_arrival_time", 0)
-	local pullDelay = ply:GetNW2Float("brgear_grapple_pull_delay", 0)
-	if CurTime() < arrivalTime + pullDelay then return end
-
-	local fallSpeed = -mv:GetVelocity().z
-	local direction = (ply:GetNW2Vector("brgear_grapple_target", Vector()) - ply:EyePos()):GetNormalized()
-	local vel = mv:GetVelocity():Length()
-	mv:SetVelocity(shared.ComputePushVelocity(direction, vel, fallSpeed, mod.config))
+function mod.init(ply)
+	return shared.GetStates(mod.config)
 end
 
 function mod.destroy(ply, state)

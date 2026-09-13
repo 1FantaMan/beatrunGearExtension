@@ -1,5 +1,22 @@
-2026-09-02 Make Gears Unusable while Typing (like in chat and while being in interface) +General @bug
-2026-09-02 Make Gears Unusable while Driving +General @bug
-2026-09-02 Fix issue with the grappler causing lag with a reflection surface +LeftArm @bug
-(A) 2026-09-02 Add prediction to gears +General @feature
-2026-09-02 Make the grappler's crosshair hidden while aiming +LeftArm @feature
+x 2026-09-08 2026-09-02 Make Gears Unusable while Typing (like in chat and while being in interface) +General @bug
+x 2026-09-12 2026-09-02 Make +Gears Unusable while Driving @bug
+x 2026-09-12 2026-09-02 Fix issue with the +Grappler causing lag with a reflection surface @leftArmGear @bug
+x 2026-09-03 2026-09-02 Add prediction to grappler +Prediction @feature
+2026-09-02 Make the +Grappler crosshair hidden while aiming @leftArmGear @feature
+x 2026-09-07 2026-09-03 Add prediction to thruster +Prediction @feature
+x 2026-09-07 2026-09-03 Add prediction to wingsuit +Prediction @feature
+x 2026-09-07 2026-09-07 fix gears causing noclip issues when using it while in action +General @bug
+x 2026-09-07 2026-09-07 Fix issue with client and prediction +Prediction @bug
+x 2026-09-07 2026-09-07 Add Setting to change the punch of the camera shake +Grappler +LeftArm @feature
+x 2026-09-08 2026-09-07 replace how storing the info with `eventslut` +BeatrunInternal @beatrun_fork-animfix @bug
+x 2026-09-08 2026-09-07 remove unneccesary "or" condition in line 1301 +BeatrunInternal @beatrun_fork-animfix @refactor
+x 2026-09-08 2026-09-08 Fix grappler making animation spammable +Grappler +LeftArm @bug
+x 2026-09-08 2026-09-08 remove "IsBeatrunAnimFork" when stock beatrun updates +BeatrunInternal @beatrun_fork-animfix
+x 2026-09-08 2026-09-08 Apply new animations (grapple_throw, grapple_pull/hooked) to grappler mod +Grappler @feature
+x 2026-09-10 2026-09-08 Add body animation fixes when animator makes fullbody anim +Grappler @refactor
+x 2026-09-10 2026-09-09 Fix issue with the +Grappler not reseting the refills while in ground @bug
+x 2026-09-10 2026-09-09 Fix issue with +Grappler causing camera to be stuck while sliding +LeftArm +BeatrunInternal @bug @refactor @beatrun_fork-animfix
+x 2026-09-12 2026-09-11 Fix +Grappler causing anim issues while running (like wallrun) +BeatrunInternal +Gears @beatrun_fork-animfix @bug @leftArmGear
+x 2026-09-12 2026-09-12 Fix camera issue with +Grappler making it stuck while sliding +Gears @leftArmGear @bug
+(C) 2026-09-12 polish the codebase +General @refactor
+(B) 2026-09-12 new @leftArmGear "claws" that lets u climb walls using keybind while facing a wall +Gears +General +Prediction @feature

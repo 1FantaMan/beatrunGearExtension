@@ -1,5 +1,6 @@
 -- same override, client realm: needed so sliding prediction matches the server's result (see server.lua)
-include("beatrun/sh/modules.lua").Get("slideOverride")
+local util = include("beatrun/sh/util.lua")
+local slideOverride = util.slideOverride
 
 local mod = {}
 

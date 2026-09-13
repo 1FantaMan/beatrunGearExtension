@@ -43,6 +43,12 @@ local function OnParkour(action, ply)
 	for slot, gearData in pairs(data.gears) do
 		if gearData == "" then continue end
 
+		local sharedGear = gearsHandler.GetSharedGear(gearData.name)
+		if sharedGear and sharedGear.onParkour then
+			sharedGear.onParkour(ply, gearData.state, action)
+			continue
+		end
+
 		local gear = gearsHandler.GetServerGear(gearData.name)
 		if gear and gear.onParkour then
 			gear.onParkour(ply, gearData.state, action)
@@ -53,9 +59,16 @@ end
 local function OnSetupMove(ply, mv, cmd)
 	local data = mod.plys[ply:SteamID64()]
 	if data == nil then return end
+	if ply:InVehicle() then return end
 
 	for slot, gearData in pairs(data.gears) do
 		if gearData == "" then continue end
+
+		local sharedGear = gearsHandler.GetSharedGear(gearData.name)
+		if sharedGear and sharedGear.onSetupMove then
+			sharedGear.onSetupMove(ply, mv, gearData.state)
+			continue
+		end
 
 		local gear = gearsHandler.GetServerGear(gearData.name)
 		if gear and gear.onSetupMove then
@@ -78,7 +91,7 @@ end
 function mod.OnPlayerSpawn(ply)
 	local newData = {}
 
-	newData.beatrunlevel = 1 --> this will be changed if the server is not dedicated
+	newData.beatrunlevel = 1 -- read by mod.GetLevel on non-dedicated servers, where Beatrun's own GetLevel() is unavailable
 	newData.gears = {}
 
 	for gearType, _ in pairs(gearSlots.SLOTS) do
@@ -176,6 +189,10 @@ function mod.OnGearKeyPress(ply, slot)
 		return false, "'" .. slot .. "' is not a valid slot or not active."
 	end
 
+	if ply:InVehicle() then
+		return false, "Gears are unusable while driving."
+	end
+
 	local data = mod.plys[ply:SteamID64()]
 	if data == nil then
 		return false, "Data doesnt exist for '" .. ply:Nick() .. "'."
@@ -197,8 +214,8 @@ function mod.OnGearKeyPress(ply, slot)
 
 	if CurTime() - data.gears[slot].lastActivateTime < (gear.config.cooldown or 0) then
 		return false,
-			 "'" ..
-			 data.gears[slot].name .. "' is still on cooldown '" .. CurTime() - data.gears[slot].lastActivateTime .. "'"
+			"'" ..
+			data.gears[slot].name .. "' is still on cooldown '" .. CurTime() - data.gears[slot].lastActivateTime .. "'"
 	end
 
 	local activated = true
@@ -213,11 +230,14 @@ function mod.OnGearKeyPress(ply, slot)
 
 	data.gears[slot].lastActivateTime = CurTime()
 
-	net.Start("BeatrunGearsClientActivate")
-	net.WriteString(slot)
-	net.WriteString(data.gears[slot].name)
-	net.WriteTable(data.gears[slot].state.shared or {})
-	net.Send(ply)
+	-- gears fully migrated to shared onSetupMove have no activate() on either side; skip the net message
+	if gear.activate then
+		net.Start("BeatrunGearsClientActivate")
+		net.WriteString(slot)
+		net.WriteString(data.gears[slot].name)
+		net.WriteTable(data.gears[slot].state.shared or {})
+		net.Send(ply)
+	end
 
 	return true, "successfully activated '" .. slot .. "'."
 end

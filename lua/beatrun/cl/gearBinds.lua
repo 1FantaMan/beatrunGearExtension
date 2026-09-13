@@ -4,7 +4,14 @@ local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 
 local keyStates = {}
 
+local isTyping = false
+hook.Add("StartChat", "BeatrunGearsBindsChatDetect", function() isTyping = true end)
+hook.Add("FinishChat", "BeatrunGearsBindsChatDetect", function() isTyping = false end)
+
 local function OnThink()
+	if isTyping or gui.IsConsoleVisible() then return end
+	if LocalPlayer():InVehicle() then return end
+
 	for slotName, slotInfo in pairs(gearSlots.SLOTS) do
 		if not slotInfo.active then continue end
 

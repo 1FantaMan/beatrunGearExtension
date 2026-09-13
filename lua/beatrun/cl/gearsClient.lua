@@ -1,6 +1,6 @@
 local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 
-local RECONCILE_WINDOW = 0.5
+local RECONCILE_WINDOW = 0.5 -- if we already predicted this activate locally, skip replaying it when the server confirms
 
 BeatrunGearsClientGears = BeatrunGearsClientGears or {}
 local clientGears = BeatrunGearsClientGears
@@ -26,31 +26,38 @@ local function OnGearChange()
 end
 
 local function OnGearActivate()
-  local slot = net.ReadString()
-  local name = net.ReadString()
-  local serverShared = net.ReadTable()
+	local slot = net.ReadString()
+	local name = net.ReadString()
+	local serverShared = net.ReadTable()
 
-  local entry = clientGears[slot]
-  if entry == nil or entry == "" then return end
+	local entry = clientGears[slot]
+	if entry == nil or entry == "" then return end
 
-  entry.state.shared = entry.state.shared or {}
-  table.Merge(entry.state.shared, serverShared)
+	entry.state.shared = entry.state.shared or {}
+	table.Merge(entry.state.shared, serverShared)
 
-  local alreadyPredicted = entry.lastPredictedActivate and (CurTime() - entry.lastPredictedActivate) < RECONCILE_WINDOW
-  entry.lastPredictedActivate = nil
+	local alreadyPredicted = entry.lastPredictedActivate and (CurTime() - entry.lastPredictedActivate) < RECONCILE_WINDOW
+	entry.lastPredictedActivate = nil
 
-  if not alreadyPredicted then
-    gearsHandler.GetClientGear(entry.name).activate(LocalPlayer(), entry.state)
-  end
+	if not alreadyPredicted then
+		gearsHandler.GetClientGear(entry.name).activate(LocalPlayer(), entry.state)
+	end
 
-  entry.lastActivateTime = CurTime()
+	entry.lastActivateTime = CurTime()
 end
 
 local function OnSetupMoveClient(ply, mv, cmd)
 	if ply ~= LocalPlayer() then return end
+	if ply:InVehicle() then return end
 
 	for slot, entry in pairs(clientGears) do
 		if entry == "" then continue end
+
+		local sharedGear = gearsHandler.GetSharedGear(entry.name)
+		if sharedGear and sharedGear.onSetupMove then
+			sharedGear.onSetupMove(ply, mv, entry.state)
+			continue
+		end
 
 		local gear = gearsHandler.GetClientGear(entry.name)
 		if gear and gear.onSetupMove then

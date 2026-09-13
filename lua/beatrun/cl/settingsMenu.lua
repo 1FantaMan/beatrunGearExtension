@@ -1,7 +1,6 @@
 local gearSlots = include("beatrun/sh/gearSlots.lua")
 local keybinds = include("beatrun/sh/modules.lua").Get("gearKeybinds")
--- side-effect only: guarantees the rope color convars exist even if grappler's own client.lua
--- (which normally registers them) hasn't loaded yet - guarded internally, safe to include again
+-- side-effect only: guarantees the rope color convars exist even before grappler's own client.lua loads
 include("beatrun/gears/grappler/visuals/ropeColor.lua")
 
 local KEYBIND_ROWS = {

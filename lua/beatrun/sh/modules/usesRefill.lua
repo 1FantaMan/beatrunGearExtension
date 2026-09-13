@@ -16,26 +16,32 @@ function mod.New(gearMod, usesField)
   local function refill(ply, state)
     state.waitingForLanding = false
     state[usesField] = gearMod.config.max_uses
-    refiller.Broadcast(ply, state)
+
+    -- SetNW2Int is server-only; client-side callers just skip the broadcast and keep their own local count
+    if SERVER then
+      refiller.Broadcast(ply, state)
+    end
   end
 
-  -- call once right after a use, so landing (real ground) refills it
+  local MIN_STATIONARY_REFILL_DELAY = 0.5 -- anti-spam floor so a use that never leaves the ground can't refill instantly
+
   function refiller.StartWaiting(state)
     state.waitingForLanding = true
+    state.waitStartTime = CurTime()
   end
 
-  -- call from the gear's onParkour(ply, state, action)
   function refiller.OnParkour(ply, state, action)
     if action ~= "land" or not state.waitingForLanding then return end
     if not groundCheck.IsRealGround(ply) then return end
     refill(ply, state)
   end
 
-  -- call from the gear's onTick(ply, state) as a fallback (e.g. already grounded, no "land" event fires)
+  -- fallback for onTick, covering cases already grounded when waiting started (no "land" event will ever fire)
   function refiller.OnTick(ply, state)
-    if state.waitingForLanding and groundCheck.IsRealGround(ply) then
-      refill(ply, state)
-    end
+    if not state.waitingForLanding then return end
+    if not groundCheck.IsRealGround(ply) then return end
+    if CurTime() - state.waitStartTime < MIN_STATIONARY_REFILL_DELAY then return end
+    refill(ply, state)
   end
 
   return refiller

@@ -1,11 +1,12 @@
 local hudStyle = include("beatrun/cl/hudStyle.lua")
-local fallLock = include("beatrun/sh/modules.lua").Get("fallLock")
+local fallLock = include("beatrun/sh/util.lua").fallLock
+local shared = include("beatrun/gears/wingsuit/shared.lua")
 
 local mod = {}
 
 local wasGliding = false
 
--- native "fall"/"falluncontrolled" events would hijack JumpAnim's state machine away from the dive pose while gliding; intercept at HOOK_HIGH (before JumpAnim's own OnParkour hook) and redirect to "divestart" instead
+-- native fall/falluncontrolled would knock JumpAnim out of the dive pose; HOOK_HIGH runs before JumpAnim sees it
 local FALL_EVENTS_TO_REDIRECT = {
   fall = true,
   falluncontrolled = true,
@@ -22,13 +23,7 @@ hook.Add("OnParkour", "BeatrunGears_WingsuitDiveOverride", function(event, ply)
 end, HOOK_HIGH)
 
 function mod.init(ply)
-  return {}
-end
-
-function mod.activate(ply, state)
-  if state.shared.isDiving then
-    ParkourEvent("divestart", ply, true)
-  end
+  return shared.GetStates(mod.config)
 end
 
 function mod.destroy(ply, state)
@@ -42,7 +37,7 @@ hook.Add("HUDPaint", "BeatrunGears_WingsuitHUD", function()
   local power = ply:GetNW2Float("brgear_wingsuit_glidepower", 0)
   local frac = math.Clamp(power / mod.config.glide_power_max, 0, 1)
 
-  -- replicate Beatrun's own bgpadding calc (cl/HUD.lua) so our box matches the native one's actual width, not just its minimum
+  -- mirrors Beatrun's own bgpadding calc (cl/HUD.lua) so this matches the native box's real width, not its minimum
   local nicktext = GetConVar("Beatrun_HUDXP"):GetBool() and (ply:Nick() .. " | " .. ply:GetXP() .. "XP") or ply:Nick()
   surface.SetFont("BeatrunHUDSmall")
   local nickw = surface.GetTextSize(nicktext)

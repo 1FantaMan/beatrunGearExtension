@@ -1,4 +1,4 @@
--- shared by both rope files; include() doesn't cache, so GetConVar() guards against double-registering
+-- shared by both rope files; CreateClientConVar is safe to call again if this file gets include()d twice
 local mod = {}
 
 local function EnsureConVar(name, default, help, min, max)

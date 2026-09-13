@@ -1,5 +1,6 @@
--- slide-speed override lives here; loading it registers its hooks once, the first time anyone equips this gear
-include("beatrun/sh/modules.lua").Get("slideOverride")
+-- referencing util.slideOverride forces its lazy load, registering its hooks once, the first time anyone equips this gear
+local util = include("beatrun/sh/util.lua")
+local slideOverride = util.slideOverride
 
 local mod = {}
 

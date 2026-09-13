@@ -41,8 +41,7 @@ local function BuildPanel(panel)
     lastSelectedPreset = value
   end
 
-  -- rebuilds this panel the moment fresh state actually arrives from the server, rather than
-  -- guessing a fixed delay after sending a concommand (which could rebuild before it lands)
+  -- rebuilds this panel once fresh state actually arrives, instead of guessing a fixed delay after a concommand
   gearAdmin.OnStateUpdated = function()
     if IsValid(panel) then BuildPanel(panel) end
   end
@@ -173,9 +172,6 @@ local function BuildPanel(panel)
 
       local overrides = gearAdmin.state.tuning[folder]
       local current = (overrides and overrides[field] ~= nil) and overrides[field] or defaults[field]
-      if field == "max_uses" then
-        print("[gearAdminMenu DEBUG]", folder, field, "overrides=", overrides and overrides[field], "defaults[field]=", defaults[field], "-> current=", current)
-      end
 
       local wang = vgui.Create("DNumberWang", row)
       wang:Dock(LEFT)

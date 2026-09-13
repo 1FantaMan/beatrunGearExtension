@@ -34,9 +34,7 @@ local function GetGear(name)
   return SERVER and gearsHandler.GetServerGear(name) or gearsHandler.GetClientGear(name)
 end
 
--- always resets to the pristine defaultConfig first, then layers current overrides on top - so
--- clearing an override (or switching to a state that no longer has one) actually reverts it,
--- instead of leaving the field stuck at whatever it was last tuned to
+-- resets to defaultConfig first, then layers overrides on top - so clearing one actually reverts it
 local function ApplyTuning(name)
   local gear = GetGear(name)
   if not gear then return end
@@ -120,8 +118,7 @@ function mod.SavePreset(presetName)
   SavePresets()
 end
 
--- reapplies every gear tuned by either the old or new state, not just the new one, so a gear
--- that had an override before but doesn't in the loaded preset actually reverts to default
+-- reapplies every gear tuned by either state, not just the new one, so a dropped override reverts to default
 local function ApplyTuningDiff(previousTuning)
   local names = {}
   for name in pairs(previousTuning) do names[name] = true end
@@ -180,8 +177,7 @@ if SERVER then
 else
   mod.presetNames = {}
 
-  -- gearAdminMenu.lua sets this to rebuild itself whenever fresh state actually arrives, instead
-  -- of guessing a fixed delay after sending a concommand
+  -- gearAdminMenu.lua sets this to rebuild itself when fresh state arrives, instead of guessing a delay
   mod.OnStateUpdated = nil
 
   net.Receive("BeatrunGearsAdminState", function()

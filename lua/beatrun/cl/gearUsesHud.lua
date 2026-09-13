@@ -37,8 +37,7 @@ local BOX_GAP = 8
 local MARGIN_X = 20
 local LABEL_PADDING = 16
 
--- ammo HUDs (PKAD, and GMod's own native one) mirror the corner box into this same right-side band
--- whenever a real ammo weapon is out, so clear that space instead of overlapping it
+-- ammo HUDs (PKAD, GMod's native one) reuse this same right-side band when a real ammo weapon is out
 local AMMO_HUD_HEIGHT = 85
 local AMMO_HUD_CLEARANCE_GAP = 10
 

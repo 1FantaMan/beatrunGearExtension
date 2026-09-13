@@ -1,5 +1,5 @@
 -- disables fall-panic camera lock while equipped; shares the refcounted fallLock module with wingsuit/client.lua
-local fallLock = include("beatrun/sh/modules.lua").Get("fallLock")
+local fallLock = include("beatrun/sh/util.lua").fallLock
 
 local mod = {}
 

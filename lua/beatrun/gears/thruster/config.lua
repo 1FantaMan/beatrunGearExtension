@@ -16,5 +16,10 @@ return {
   dash_max_speed = 590,
   dive_dash_multiplier = 1.15,
 
+  -- prevents using the dash's upward velocity boost to cancel real fall damage (a "double jump" exploit)
+  fall_damage_threshold = 700,
+  fall_boost_penalty_scale = 0.001,
+  min_fall_boost_penalty = 0.3,
+
   thrust_sound = "beatrun/gears/thruster/thrust.wav",
 }
