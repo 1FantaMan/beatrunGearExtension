@@ -7,12 +7,16 @@ local mod = {}
 
 local usesRefill = util.usesRefill.New(mod, "uses")
 
+-- EXPERIMENT (ease-in dash velocity): tune/remove this if it doesn't feel right; REVERT by deleting this constant too
+local DASH_EASE_DURATION = 0.12
+
 function mod.GetStates(config)
 	return {
 		uses = config.max_uses,
 		lastUsed = CurTime(),
 		airStartTime = 0,
 		wasOnGround = true,
+		dashing = false, -- EXPERIMENT (ease-in dash velocity): REVERT by deleting this field
 		shared = {},
 	}
 end
@@ -52,6 +56,23 @@ function mod.onSetupMove(ply, mv, state)
 	local config = mod.config
 
 	usesRefill.OnTick(ply, state)
+
+	-- EXPERIMENT (ease-in dash velocity): this whole block is new. REVERT by deleting it entirely and moving
+	-- `mv:SetVelocity(mod.ComputeDashVelocity(ply, mv:GetVelocity(), look, config))` back to run instantly where
+	-- the dash trigger sets state.dashing below (see the matching EXPERIMENT comment further down in this function).
+	-- Chases the engine's own live velocity toward the target instead of overriding it outright each tick, so
+	-- gravity/collision this tick still apply naturally and we only nudge the result - less fighting the physics step.
+	if state.dashing then
+		local elapsed = CurTime() - state.dashStartTime
+
+		if elapsed >= DASH_EASE_DURATION then
+			mv:SetVelocity(state.dashTargetVelocity)
+			state.dashing = false
+		else
+			local chaseT = math.Clamp(FrameTime() / DASH_EASE_DURATION, 0, 1)
+			mv:SetVelocity(LerpVector(chaseT, mv:GetVelocity(), state.dashTargetVelocity))
+		end
+	end
 
 	local onGround = ply:IsOnGround()
 	if not onGround and state.wasOnGround then
