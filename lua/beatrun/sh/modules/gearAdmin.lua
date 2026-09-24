@@ -169,10 +169,21 @@ if SERVER then
     net.Send(ply)
   end
 
-  function mod.Broadcast()
+  -- excludePly skips the admin who just made the change - their own panel already reflects it locally,
+  -- and rebroadcasting to them would rebuild their panel mid-edit (destroying the widget they're using)
+  function mod.Broadcast(excludePly)
+    local recipients = {}
+    for _, ply in ipairs(player.GetAll()) do
+      if ply ~= excludePly then
+        recipients[#recipients + 1] = ply
+      end
+    end
+
+    if #recipients == 0 then return end
+
     net.Start("BeatrunGearsAdminState")
       net.WriteString(Payload())
-    net.Send(player.GetAll())
+    net.Send(recipients)
   end
 else
   mod.presetNames = {}

@@ -2,8 +2,6 @@
 local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
 local EXCLUDED_TUNING_FIELDS = { name = true, displayname = true, level = true, type = true }
-local DEFAULT_PRESET_NAME = "Default" -- reserved, not a real saved preset - resets everything via brgears_admin_resetdefault
-local lastSelectedPreset = DEFAULT_PRESET_NAME -- persists across BuildPanel rebuilds, so selection survives a Load/Delete/Save
 
 local function DefaultConfig(folder)
   return include("beatrun/gears/" .. folder .. "/config.lua")
@@ -23,74 +21,23 @@ end
 local function BuildPanel(panel)
   panel:Clear()
 
-  panel:Help("Presets")
-
-  local presetRow = vgui.Create("DPanel", panel)
-  presetRow:SetTall(26)
-  presetRow.Paint = function() end
-  panel:AddItem(presetRow)
-
-  local presetCombo = vgui.Create("DComboBox", presetRow)
-  presetCombo:Dock(LEFT)
-  presetCombo:SetWide(150)
-  presetCombo:AddChoice(DEFAULT_PRESET_NAME, nil, lastSelectedPreset == DEFAULT_PRESET_NAME)
-  for _, name in ipairs(gearAdmin.presetNames) do
-    presetCombo:AddChoice(name, nil, lastSelectedPreset == name)
-  end
-  presetCombo.OnSelect = function(_, _, value)
-    lastSelectedPreset = value
-  end
-
   -- rebuilds this panel once fresh state actually arrives, instead of guessing a fixed delay after a concommand
   gearAdmin.OnStateUpdated = function()
     if IsValid(panel) then BuildPanel(panel) end
   end
 
-  local loadBtn = vgui.Create("DButton", presetRow)
+  -- TODO: preset save/load/delete UI removed for now, will come back later
+  local loadRow = vgui.Create("DPanel", panel)
+  loadRow:SetTall(26)
+  loadRow.Paint = function() end
+  panel:AddItem(loadRow)
+
+  local loadBtn = vgui.Create("DButton", loadRow)
   loadBtn:SetText("Load")
   loadBtn:Dock(LEFT)
-  loadBtn:DockMargin(4, 0, 0, 0)
   loadBtn:SetWide(50)
   loadBtn.DoClick = function()
-    local name = presetCombo:GetSelected()
-    if not name or name == "" then return end
-    if name == DEFAULT_PRESET_NAME then
-      RunConsoleCommand("brgears_admin_resetdefault")
-    else
-      RunConsoleCommand("brgears_admin_loadpreset", name)
-    end
-  end
-
-  local deleteBtn = vgui.Create("DButton", presetRow)
-  deleteBtn:SetText("Delete")
-  deleteBtn:Dock(LEFT)
-  deleteBtn:DockMargin(4, 0, 0, 0)
-  deleteBtn:SetWide(50)
-  deleteBtn.DoClick = function()
-    local name = presetCombo:GetSelected()
-    if not name or name == "" or name == DEFAULT_PRESET_NAME then return end
-    RunConsoleCommand("brgears_admin_deletepreset", name)
-  end
-
-  local saveRow = vgui.Create("DPanel", panel)
-  saveRow:SetTall(26)
-  saveRow.Paint = function() end
-  panel:AddItem(saveRow)
-
-  local presetNameEntry = vgui.Create("DTextEntry", saveRow)
-  presetNameEntry:Dock(LEFT)
-  presetNameEntry:SetWide(150)
-  presetNameEntry:SetPlaceholderText("new preset name")
-
-  local saveBtn = vgui.Create("DButton", saveRow)
-  saveBtn:SetText("Save")
-  saveBtn:Dock(LEFT)
-  saveBtn:DockMargin(4, 0, 0, 0)
-  saveBtn:SetWide(50)
-  saveBtn.DoClick = function()
-    local name = presetNameEntry:GetValue()
-    if name == "" or name == DEFAULT_PRESET_NAME then return end
-    RunConsoleCommand("brgears_admin_savepreset", name)
+    RunConsoleCommand("brgears_admin_refresh")
   end
 
   panel:Help(" ")

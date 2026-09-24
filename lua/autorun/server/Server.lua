@@ -9,11 +9,12 @@ util.AddNetworkString("BeatrunGearsClientActivate")
 util.AddNetworkString("BeatrunGearsKeyPress")
 util.AddNetworkString("BeatrunGearsKeyRelease")
 util.AddNetworkString("BeatrunGearsAdminState")
+util.AddNetworkString("BeatrunGearsLevelSynced")
 
 local playerHandler = include("beatrun/sv/playerHandler.lua")
 local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
 
-local lastClientLevelTime = 0
+local lastClientLevelTime = {} -- keyed by steamid64, so one player's update can't throttle another's
 
 local ACTIVATE_NET_INTERVAL = 0.2
 local ACTIVATE_FLOOD_LIMIT = 5
@@ -50,14 +51,20 @@ end
 local function OnClientLevel(_, ply)
 	if game.IsDedicated() then return end
 
-	if CurTime() - lastClientLevelTime < 5 then return end
-	lastClientLevelTime = CurTime()
+	local steamid = ply:SteamID64()
+	if CurTime() - (lastClientLevelTime[steamid] or 0) < 5 then return end
+	lastClientLevelTime[steamid] = CurTime()
 
-	local data = playerHandler.plys[ply:SteamID64()]
+	local data = playerHandler.plys[steamid]
 	if data == nil then return end
 
 	local newLevel = net.ReadInt(16)
 	data.beatrunlevel = newLevel
+
+	-- tells the client its real level has actually landed server-side, so auto-equip can safely fire instead
+	-- of guessing a delay long enough to beat this net round-trip
+	net.Start("BeatrunGearsLevelSynced")
+	net.Send(ply)
 end
 
 local function OnClientKeyPress(_, ply)
@@ -100,7 +107,7 @@ local function conCmdAdminToggle(ply, cmd, args)
 	end
 
 	gearAdmin.SetDisabled(args[1], not gearAdmin.IsDisabled(args[1]))
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminSetLevel(ply, cmd, args)
@@ -111,7 +118,7 @@ local function conCmdAdminSetLevel(ply, cmd, args)
 	end
 
 	gearAdmin.SetLevelOverride(args[1], args[2] == "default" and nil or tonumber(args[2]))
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminSetTuning(ply, cmd, args)
@@ -127,7 +134,7 @@ local function conCmdAdminSetTuning(ply, cmd, args)
 		gearAdmin.SetTuning(args[1], args[2], tonumber(args[3]))
 	end
 
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminSavePreset(ply, cmd, args)
@@ -138,7 +145,7 @@ local function conCmdAdminSavePreset(ply, cmd, args)
 	end
 
 	gearAdmin.SavePreset(args[1])
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminLoadPreset(ply, cmd, args)
@@ -149,7 +156,7 @@ local function conCmdAdminLoadPreset(ply, cmd, args)
 	end
 
 	gearAdmin.LoadPreset(args[1])
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminDeletePreset(ply, cmd, args)
@@ -160,14 +167,20 @@ local function conCmdAdminDeletePreset(ply, cmd, args)
 	end
 
 	gearAdmin.DeletePreset(args[1])
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
 end
 
 local function conCmdAdminResetDefault(ply, cmd, args)
 	if not gearAdmin.CanManage(ply) then return end
 
 	gearAdmin.ResetToDefault()
-	gearAdmin.Broadcast()
+	gearAdmin.Broadcast(ply)
+end
+
+local function conCmdAdminRefresh(ply, cmd, args)
+	if not IsValid(ply) then return end
+
+	gearAdmin.SendTo(ply)
 end
 
 for _, fileName in ipairs(file.Find("beatrun/cl/*.lua", "LUA")) do
@@ -213,7 +226,18 @@ for _, folderName in ipairs(folders) do
 	end
 end
 
-hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", playerHandler.OnPlayerSpawn)
+local function OnPlayerInitialSpawn(ply)
+	playerHandler.OnPlayerSpawn(ply)
+
+	-- dedicated mode never needs a client level sync (ply:GetLevel() is already authoritative), so signal
+	-- readiness immediately instead of leaving the client waiting on a sync message that'll never arrive
+	if game.IsDedicated() then
+		net.Start("BeatrunGearsLevelSynced")
+		net.Send(ply)
+	end
+end
+
+hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", OnPlayerInitialSpawn)
 hook.Add("PlayerInitialSpawn", "BeatrunGearsAdminStateSync", gearAdmin.SendTo)
 net.Receive("BeatrunGearsClientLevel", OnClientLevel)
 net.Receive("BeatrunGearsKeyPress", OnClientKeyPress)
@@ -227,3 +251,4 @@ concommand.Add("brgears_admin_savepreset", conCmdAdminSavePreset)
 concommand.Add("brgears_admin_loadpreset", conCmdAdminLoadPreset)
 concommand.Add("brgears_admin_deletepreset", conCmdAdminDeletePreset)
 concommand.Add("brgears_admin_resetdefault", conCmdAdminResetDefault)
+concommand.Add("brgears_admin_refresh", conCmdAdminRefresh)

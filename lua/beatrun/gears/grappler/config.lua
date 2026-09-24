@@ -8,6 +8,7 @@ return {
 	max_uses = 2,
 	min_range = 500,
 	max_range = 1300,
+	reacquire_tolerance = 150,
 	travel_speed = 1750,
 	max_travel_time = 0.15,
 	pull_delay_speed = 5000,
@@ -18,7 +19,7 @@ return {
 	push_max_speed = 1200,
 
 	fall_damage_threshold = 700,
-	fall_damage_scale = 0.15,
+	fall_damage_scale = 0.5,
 	fall_push_penalty_scale = 0.001,
 	min_fall_push_penalty = 0.3,
 

@@ -16,19 +16,15 @@ function mod.GetStates(config)
 		lastUsed = CurTime(),
 		airStartTime = 0,
 		wasOnGround = true,
-		dashing = false, -- EXPERIMENT (ease-in dash velocity): REVERT by deleting this field
+		dashing = false,
 		shared = {},
 	}
 end
 
 function mod.ComputeDashVelocity(ply, vel, look, config)
 	local speed = vel:Length()
-	local dashSpeed = speed * config.dash_speed
+	local dashSpeed = speed + config.dash_speed
 	local fallSpeed = -vel.z
-
-	if ply:GetDive() then
-		dashSpeed = dashSpeed * config.dive_dash_multiplier
-	end
 
 	-- how much of the upward boost applies - falls off at high fall speed so dashing can't cancel real fall damage
 	local boostPenalty = 1
@@ -57,11 +53,6 @@ function mod.onSetupMove(ply, mv, state)
 
 	usesRefill.OnTick(ply, state)
 
-	-- EXPERIMENT (ease-in dash velocity): this whole block is new. REVERT by deleting it entirely and moving
-	-- `mv:SetVelocity(mod.ComputeDashVelocity(ply, mv:GetVelocity(), look, config))` back to run instantly where
-	-- the dash trigger sets state.dashing below (see the matching EXPERIMENT comment further down in this function).
-	-- Chases the engine's own live velocity toward the target instead of overriding it outright each tick, so
-	-- gravity/collision this tick still apply naturally and we only nudge the result - less fighting the physics step.
 	if state.dashing then
 		local elapsed = CurTime() - state.dashStartTime
 
@@ -88,35 +79,28 @@ function mod.onSetupMove(ply, mv, state)
 	if state.uses <= 0 then return end
 
 	state.lastUsed = CurTime()
-	local isDiving = state.uses == 1
 	state.uses = math.max(0, state.uses - 1)
-
-	if isDiving then
-		ply:SetDive(true)
-		ParkourEvent("divestart", ply, true)
-
-		if CLIENT and IsFirstTimePredicted() then
-			ply:ViewPunch(Angle(-10, 0, 0))
-		end
-	end
 
 	if SERVER then
 		sound.Play(ply, config.thrust_sound)
 		usesRefill.Broadcast(ply, state)
 	end
 
+	if game.SinglePlayer() then
+		ply:SendLua("LocalPlayer():CLViewPunch(Angle(6 * LocalPlayer():GetInfoNum('brgears_screenshake_scale', 1), 0, 0))")
+	elseif CLIENT and IsFirstTimePredicted() then
+		local shakeScale = ply:GetInfoNum("brgears_screenshake_scale", 1)
+		ply:CLViewPunch(Angle(6 * shakeScale, 0, 0))
+	end
+
 	usesRefill.StartWaiting(state)
 
-	if not isDiving then
-		ParkourEvent("jumpfar", ply, true)
-	end
+	ParkourEvent("jumpfar", ply, true)
 
 	local look = ply:EyeAngles():Forward()
 	look.z = 0
 	look:Normalize()
 
-	-- EXPERIMENT (ease-in dash velocity): REPLACES the old instant `mv:SetVelocity(mod.ComputeDashVelocity(ply,
-	-- mv:GetVelocity(), look, config))` call. REVERT by deleting these 3 lines and putting that call back here.
 	state.dashing = true
 	state.dashStartTime = CurTime()
 	state.dashTargetVelocity = mod.ComputeDashVelocity(ply, mv:GetVelocity(), look, config)

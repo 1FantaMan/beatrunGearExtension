@@ -6,17 +6,37 @@ local shared = include("beatrun/gears/grappler/shared.lua")
 
 local mod = {}
 
+-- own copy of shared.lua's UpdateHookTracking freeze/reacquire logic, kept independent and driven by
+-- HUDPaint instead of onSetupMove - onSetupMove never runs client-side in true singleplayer, so a version
+-- that depended on it would never update the crosshair when testing solo
+local trackedHitPos
+
 function mod.GetHookPosition(ply)
 	local startPos = ply:EyePos()
-	local dir = ply:EyeAngles():Forward()
+	local direction = ply:EyeAngles():Forward()
+	local trace = shared.ComputeGrapplerRaycast(ply, startPos, direction, mod.config)
 
-	local trace = shared.ComputeGrapplerRaycast(ply, startPos, dir, mod.config)
-
-	if trace then
-		return trace.HitPos, true
+	if shared.IsBlockedTrace(trace) then
+		trace = nil
 	end
 
-	return startPos + dir * mod.config.max_range, false
+	if trace then
+		trackedHitPos = trace.HitPos
+		return trackedHitPos, true
+	end
+
+	if trackedHitPos then
+		local endPos = startPos + direction * mod.config.max_range
+		local dist = select(1, _G.util.DistanceToLine(startPos, endPos, trackedHitPos))
+
+		if dist <= mod.config.reacquire_tolerance then
+			return trackedHitPos, true
+		end
+	end
+
+	trackedHitPos = nil
+
+	return startPos + direction * mod.config.max_range, false
 end
 
 crosshairProjected.Init(mod)
@@ -25,20 +45,16 @@ util.RegisterSafeAnim("grapple_throw", {
 	model = "beatrun/gears/grappler/anims/grappler_arms",
 })
 
--- fraction of the pull sequence's full length to play before cutting back to idle; tune by feel
-local PULL_TRANSITION_CYCLE = 0.25
-
 local pullData = {
 	model = "beatrun/gears/grappler/anims/grappler_arms",
-	fallbackEvent = false, -- "jumpstill" is a floating pose; go straight back to normal idle/walk instead
+	fallbackEvent = false,
 	transitioncheck = function(ply)
-		return BodyAnimCycle >= PULL_TRANSITION_CYCLE
+		return BodyAnimCycle >= 0.25 -- goes around frame 17-19 of the anim
 	end,
 }
 
--- grounded pull keeps the old arms-only anim; the fullbody one's leg motion looks like floating while grounded
 util.RegisterSafeAnim("grapple_pull", pullData)
-util.RegisterSafeAnim("grapple_pull_air", pullData)
+util.RegisterSafeAnim("grapple_pull_air", pullData) -- this is the fullbody anim, just only works for air :)
 
 function mod.init(ply)
 	return shared.GetStates(mod.config)

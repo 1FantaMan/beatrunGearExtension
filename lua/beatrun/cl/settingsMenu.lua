@@ -1,6 +1,5 @@
 local gearSlots = include("beatrun/sh/gearSlots.lua")
 local keybinds = include("beatrun/sh/modules.lua").Get("gearKeybinds")
--- side-effect only: guarantees the rope color convars exist even before grappler's own client.lua loads
 include("beatrun/gears/grappler/visuals/ropeColor.lua")
 
 local KEYBIND_ROWS = {
@@ -20,14 +19,13 @@ local SCROLLER_ROWS = {
 	},
 }
 
--- DesktopWindows VGUI focus isn't reliable for OnKeyCodePressed, so key capture is a plain Think key-scan instead
 local listeningSlot = nil
 local listenStartTime = 0
-local LISTEN_DELAY = 0.25 -- ignore input for a moment so the MOUSE1 click that started listening isn't captured as the bind
+local LISTEN_DELAY = 0.25
 
 local function ScanForKeyPress()
 	for key = KEY_FIRST, KEY_LAST do
-		if key == KEY_C then continue end -- the context menu's own open keybind; still held/re-triggering while this menu is up
+		if key == KEY_C then continue end
 
 		if input.IsButtonDown(key) then return key end
 	end

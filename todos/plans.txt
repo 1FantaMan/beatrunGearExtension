@@ -1,0 +1,7 @@
+2026-09-14 Change how roll works, instead of killing speed it will turn into slide after the roll +sglove +General @rightarmGear @feature
+x 2026-09-03 2026-09-02 Add prediction to grappler +Prediction @feature
+x 2026-09-07 2026-09-03 Add prediction to thruster +Prediction @feature
+x 2026-09-07 2026-09-03 Add prediction to wingsuit +Prediction @feature
+x 2026-09-08 2026-09-07 Add Setting to change the punch of the camera shake +Grappler +LeftArm @feature
+x 2026-09-08 2026-09-08 Apply new animations (grapple_throw, grapple_pull/hooked) to grappler mod +Grappler @feature
+(B) 2026-09-17 Add paraglider (level 20-30) +Gears +General @backGear @feature
