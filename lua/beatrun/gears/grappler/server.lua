@@ -23,4 +23,24 @@ function mod.destroy(ply, state)
 	ply:SetNW2Bool("brgear_grapple_active", false)
 end
 
+function mod.OnPlayerSpawn(ply)
+	local state = GetState(ply, "left")
+	if not state then return end
+
+	-- respawning (e.g. via a dev "kill/respawn" bind) doesn't tear down the gear like unequip does,
+	-- so a mid-grapple respawn otherwise leaves brgear_grapple_active stuck true on the new life
+	state.phase = "idle"
+	state.usesRemaining = mod.config.max_uses
+	state.targetPos = nil
+	state.arrivalTime = 0
+	state.pullDelay = 0
+	state.boostTime = 0
+	state.waitingForLanding = false
+
+	ply:SetNW2Bool("brgear_grapple_active", false)
+	usesRefill.Broadcast(ply, state)
+end
+
+hook.Add("PlayerSpawn", "BeatrunGears_Grappler", mod.OnPlayerSpawn)
+
 return mod

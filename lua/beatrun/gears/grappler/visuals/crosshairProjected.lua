@@ -1,6 +1,4 @@
 -- world-projected aim reticle: draws at Vector:ToScreen() of the live aim point, or the grapple target while active
-local spinAnimation = include("beatrun/gears/grappler/visuals/spinAnimation.lua")
-
 local mod = {}
 
 local gearMod
@@ -24,35 +22,30 @@ local RANGE_FADE_MIN_ALPHA = 90 -- alpha floor from proximity fade alone
 local DISTANCE_ROTATION_DEG = 90 -- extra rotation added as aim distance approaches max_range
 local ACTIVE_SPIN_SPEED_DPS = 540 -- continuous spin speed while grappling, degrees/sec
 
-local POSITION_SMOOTH_SPEED = 12 -- how fast the drawn position chases the target position
+local POSITION_SMOOTH_SPEED = 20 -- how fast the drawn position chases the target position
 
-local MISS_DEBOUNCE = 0.1 -- how long with zero hits before counting as unreachable
-local HIT_DEBOUNCE = 0.1 -- how long with continuous hits before cancelling a miss-streak
-
-local APPEAR_DURATION = 0.3 -- fade+spin-in duration when the crosshair first appears
+local APPEAR_DURATION = 0.3 -- fade+spin-in duration when the crosshair (re)appears
 local APPEAR_SPIN_DEG = 195 -- extra rotation at the start of the appear animation, decaying to 0
 
-local unreachableAnim = spinAnimation.New()
-
--- debounce timers so a single stray hit/miss frame doesn't flip the state
-local hitStreak = 0
-local missStreak = 0
-local isUnreachable = false
+local DISAPPEAR_DURATION = 0.25 -- fade-out duration when the tracked surface is truly lost
+local DISAPPEAR_SPIN_DEG = 120 -- extra rotation added over the course of the disappear animation
 
 local activeSpinRotation = 0
 local displayX, displayY -- smoothed drawn position; nil until first valid frame
-local appearStartTime -- set when the crosshair transitions from hidden to visible; nil once consumed
+local wasReachable -- last frame's reachable state; nil until first valid frame
+local appearStartTime -- set when the crosshair transitions from unreachable to reachable; nil once consumed
+local disappearStartTime -- set when the crosshair transitions from reachable to unreachable; nil once consumed
+local lastAlpha = 0 -- alpha drawn last frame; the disappear animation fades down from this, not from 0
 
 hook.Add("HUDPaint", "BeatrunGrapplerCrosshairProjected", function()
   local ply = LocalPlayer()
   if not IsValid(ply) or not ply:Alive() or ply:GetNW2String("brgear_left", "") ~= "grappler" then
-    hitStreak = 0
-    missStreak = 0
-    isUnreachable = false
-    spinAnimation.Cancel(unreachableAnim)
     activeSpinRotation = 0
     displayX, displayY = nil, nil
+    wasReachable = nil
     appearStartTime = nil
+    disappearStartTime = nil
+    lastAlpha = 0
     return
   end
 
@@ -60,21 +53,54 @@ hook.Add("HUDPaint", "BeatrunGrapplerCrosshairProjected", function()
 
   local isActive = ply:GetNW2Bool("brgear_grapple_active", false)
 
-  -- reflects live aim even mid-grapple, so sizing/fade keep updating while position eases back after a pull
+  -- reflects live aim even mid-grapple, so sizing/fade keep updating while position eases back after a pull.
+  -- hitPos/reachable come straight from the same tracked-surface state shared.lua's onSetupMove maintains,
+  -- so this can never show a position the fire logic wouldn't also accept
   local hitPos, reachable = gearMod.GetHookPosition(ply)
   local usesRemaining = ply:GetNW2Int("brgear_" .. gearMod.config.type .. "_uses", gearMod.config.max_uses)
   reachable = reachable and usesRemaining > 0
 
-  local targetPos = isActive and ply:GetNW2Vector("brgear_grapple_target") or hitPos
-  local screenPos = targetPos:ToScreen()
-  if not screenPos.visible then return end -- behind the camera or otherwise unprojectable this frame
+  if wasReachable == nil then wasReachable = reachable end
+
+  if not isActive then
+    if reachable and not wasReachable then
+      appearStartTime = CurTime() -- fade+spin back in when the surface is (re)acquired
+      disappearStartTime = nil
+    elseif not reachable and wasReachable then
+      disappearStartTime = CurTime() -- fade out and drift to center when the surface is truly lost
+      appearStartTime = nil
+    end
+  end
+
+  wasReachable = reachable
+
+  -- once lost, aim the reticle at screen center instead of the stale/unprojectable aim point - the
+  -- existing position smoothing below then naturally drifts it there instead of snapping
+  local targetPos
+  if isActive then
+    targetPos = ply:GetNW2Vector("brgear_grapple_target")
+  elseif reachable then
+    targetPos = hitPos
+  end
+
+  local screenX, screenY
+  if targetPos then
+    local screenPos = targetPos:ToScreen()
+    if screenPos.visible then
+      screenX, screenY = screenPos.x, screenPos.y
+    end
+  end
+
+  if not screenX then
+    screenX, screenY = ScrW() / 2, ScrH() / 2
+  end
 
   if displayX == nil then
-    displayX, displayY = screenPos.x, screenPos.y
+    displayX, displayY = screenX, screenY
   else
     local smoothT = math.Clamp(FrameTime() * POSITION_SMOOTH_SPEED, 0, 1)
-    displayX = Lerp(smoothT, displayX, screenPos.x)
-    displayY = Lerp(smoothT, displayY, screenPos.y)
+    displayX = Lerp(smoothT, displayX, screenX)
+    displayY = Lerp(smoothT, displayY, screenY)
   end
 
   local distance = math.Clamp(ply:EyePos():Distance(hitPos), gearMod.config.min_range, gearMod.config.max_range)
@@ -87,35 +113,9 @@ hook.Add("HUDPaint", "BeatrunGrapplerCrosshairProjected", function()
     activeSpinRotation = (activeSpinRotation + FrameTime() * ACTIVE_SPIN_SPEED_DPS) % 360
     rotationOffset = activeSpinRotation
     alpha = 255
-
-    hitStreak = 0
-    missStreak = 0
-    if isUnreachable then
-      isUnreachable = false
-      spinAnimation.Cancel(unreachableAnim)
-    end
   else
     activeSpinRotation = 0
-
-    if reachable then
-      hitStreak = hitStreak + FrameTime()
-      missStreak = 0
-    else
-      missStreak = missStreak + FrameTime()
-      hitStreak = 0
-    end
-
-    if hitStreak >= HIT_DEBOUNCE and isUnreachable then
-      isUnreachable = false
-      spinAnimation.Cancel(unreachableAnim)
-      appearStartTime = CurTime() -- fade+spin back in when going from unreachable to reachable
-    elseif missStreak >= MISS_DEBOUNCE and not isUnreachable then
-      isUnreachable = true
-      spinAnimation.Trigger(unreachableAnim, true)
-    end
-
-    local unreachableRotation, unreachableAlpha = spinAnimation.Update(unreachableAnim)
-    rotationOffset = unreachableRotation + t * DISTANCE_ROTATION_DEG
+    rotationOffset = t * DISTANCE_ROTATION_DEG
 
     -- proximity fade: warns before it's actually confirmed unreachable
     local rangeAlpha = 255
@@ -124,7 +124,13 @@ hook.Add("HUDPaint", "BeatrunGrapplerCrosshairProjected", function()
       rangeAlpha = Lerp(fadeT, 255, RANGE_FADE_MIN_ALPHA)
     end
 
-    alpha = math.min(unreachableAlpha, rangeAlpha)
+    if reachable then
+      alpha = rangeAlpha
+    elseif disappearStartTime then
+      alpha = lastAlpha -- fade animation below takes it from here; not yet forced to 0
+    else
+      alpha = 0 -- already fully faded out (or was never reachable to begin with)
+    end
   end
 
   if appearStartTime then
@@ -132,7 +138,16 @@ hook.Add("HUDPaint", "BeatrunGrapplerCrosshairProjected", function()
     alpha = alpha * appearT
     rotationOffset = rotationOffset + Lerp(appearT, APPEAR_SPIN_DEG, 0)
     if appearT >= 1 then appearStartTime = nil end
+  elseif disappearStartTime then
+    local disappearT = math.Clamp((CurTime() - disappearStartTime) / DISAPPEAR_DURATION, 0, 1)
+    alpha = alpha * (1 - disappearT) -- fades from the alpha it had the moment the surface was lost, not from 0
+    rotationOffset = rotationOffset + Lerp(disappearT, 0, DISAPPEAR_SPIN_DEG)
+    if disappearT >= 1 then disappearStartTime = nil end
   end
+
+  lastAlpha = alpha
+
+  if alpha <= 0 then return end -- fully faded out, nothing left to draw
 
   local drawSize = (radius / TEXTURE_RADIUS_FRACTION) * 2
 
