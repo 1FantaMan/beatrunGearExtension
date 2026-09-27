@@ -17,40 +17,45 @@ local DOOR_CLASSES = {
 
 function mod.GetStates(config)
 	local state = {
-		phase = "idle",
+		-- lifecycle
+		phase = "idle", -- idle -> traveling -> done
+		usesRemaining = config.max_uses,
+		waitingForLanding = false,
+
+		-- active grapple
 		targetPos = nil,
+		targetEntity = nil, -- NPC/ragdoll being pulled to the player
+		targetPhysBone = nil, -- which physics object to grab (only used when targetEntity is a ragdoll)
 		arrivalTime = 0,
 		pullDelay = 0,
 		boostTime = 0,
-		waitingForLanding = false,
-		usesRemaining = config.max_uses,
+
+		-- aim tracking (only updated while idle)
 		trackedHitPos = nil,
+		trackedEntity = nil,
+		trackedPhysBone = nil,
 		trackedReachable = false,
 	}
 
 	return state
 end
 
-function mod.ApplyActivateState(state, startPos, hitPos, config)
+function mod.ApplyActivateState(state, startPos, hitPos, config, targetEntity, targetPhysBone)
 	local distance = startPos:Distance(hitPos)
 	local travelTime = math.min(config.max_travel_time, distance / config.travel_speed)
 
 	state.phase = "traveling"
 	state.targetPos = hitPos
+	state.targetEntity = targetEntity
+	state.targetPhysBone = targetPhysBone
 	state.arrivalTime = CurTime() + travelTime
 	state.pullDelay = math.min(config.max_pull_delay, distance / config.pull_delay_speed)
 end
 
--- keeps the aim point "stuck" to the last surface it hit through brief gaps in the trace (model seams,
--- doorways, etc) instead of flickering unreachable every frame the ray happens to miss. Only truly lets
--- go once the current aim ray has drifted far from where that surface actually was.
 function mod.IsBlockedTrace(trace)
 	return trace ~= nil and DOOR_CLASSES[trace.Entity:GetClass()] == true
 end
 
--- NOTE: this only ever actually runs server-side in true singleplayer (SetupMove is never invoked
--- client-side there), so it's the real gate for firing but can't be relied on for client-only visuals
--- like the crosshair - see crosshairProjected.lua's own independent copy of this same logic
 local function UpdateHookTracking(ply, state, config)
 	local startPos = ply:EyePos()
 	local direction = ply:EyeAngles():Forward()
@@ -62,6 +67,9 @@ local function UpdateHookTracking(ply, state, config)
 
 	if trace then
 		state.trackedHitPos = trace.HitPos
+		state.trackedEntity = (IsValid(trace.Entity) and (trace.Entity:IsNPC() or trace.Entity:IsRagdoll()))
+			and trace.Entity or nil
+		state.trackedPhysBone = trace.PhysicsBone
 		state.trackedReachable = true
 		return
 	end
@@ -77,6 +85,8 @@ local function UpdateHookTracking(ply, state, config)
 	end
 
 	state.trackedHitPos = nil
+	state.trackedEntity = nil
+	state.trackedPhysBone = nil
 	state.trackedReachable = false
 end
 
@@ -145,7 +155,7 @@ function mod.onSetupMove(ply, mv, state)
 			movement.CancelAbilities(ply)
 
 			state.usesRemaining = state.usesRemaining - 1
-			mod.ApplyActivateState(state, startPos, state.trackedHitPos, config)
+			mod.ApplyActivateState(state, startPos, state.trackedHitPos, config, state.trackedEntity, state.trackedPhysBone)
 
 			if SERVER then
 				usesRefill.Broadcast(ply, state)
@@ -163,6 +173,48 @@ function mod.onSetupMove(ply, mv, state)
 			local shakeScale = ply:GetInfoNum("brgears_screenshake_scale", 1)
 			clViewPunch(ply, Angle(1 * shakeScale, 2 * shakeScale, 0))
 		end
+	end
+
+	-- pulling an NPC/ragdoll instead of pulling ourselves to a surface: continuously push the target toward us
+	-- for the whole travel window instead of a single velocity application at arrival, since most NPCs run
+	-- their own navigation every tick and would otherwise instantly override a one-shot SetVelocity - NOT YET
+	-- CONFIRMED IN-GAME whether this is enough to actually beat that navigation for every NPC type
+	if state.phase == "traveling" and IsValid(state.targetEntity) then
+		if SERVER then
+			local target = state.targetEntity
+
+			if target:IsRagdoll() then
+				-- ragdolls are pure physics objects (one per bone) - moving the base entity does nothing.
+				-- only grab the specific limb the hook actually traced onto, not the whole ragdoll, and pull
+				-- from that limb's own position rather than the ragdoll's root
+				local phys = target:GetPhysicsObjectNum(state.targetPhysBone or 0)
+
+				if IsValid(phys) then
+					local direction = (ply:GetPos() - phys:GetPos()):GetNormalized()
+					phys:SetVelocity(direction * config.entity_pull_speed)
+				end
+			else
+				local direction = (ply:GetPos() - target:GetPos()):GetNormalized()
+				target:SetLocalVelocity(direction * config.entity_pull_speed)
+			end
+		end
+
+		if CurTime() >= state.arrivalTime + state.pullDelay then
+			state.phase = "done"
+			state.boostTime = CurTime()
+			state.targetEntity = nil
+
+			usesRefill.StartWaiting(state)
+
+			local shakeScale = ply:GetInfoNum("brgears_screenshake_scale", 1)
+			clViewPunch(ply, Angle(-1 * shakeScale, -5 * shakeScale, 0))
+
+			local pullAnim = groundCheck.IsRealGround(ply) and "grapple_pull" or "grapple_pull_air"
+			ParkourEvent(pullAnim, ply, true)
+			ParkourEvent("grappler_hooked", ply, true)
+		end
+
+		return
 	end
 
 	if state.phase == "traveling" and CurTime() >= state.arrivalTime + state.pullDelay then
