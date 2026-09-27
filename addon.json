@@ -7,6 +7,15 @@
 		"*.psd",
 		"*.xcf",
 		"*.blend",
-		"*.git*"
+		"*.git*",
+		"*.txt",
+		"*.md",
+		"*.zip",
+		"*.py",
+		"*.gma",
+		".luarc.json",
+		".editorconfig",
+		"gmaoutput_stuff/*",
+		"gears_vault/*"
 	]
 }
