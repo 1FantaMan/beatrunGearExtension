@@ -49,12 +49,12 @@ local pullData = {
 	model = "beatrun/gears/grappler/anims/grappler_arms",
 	fallbackEvent = false,
 	transitioncheck = function(ply)
-		return BodyAnimCycle >= 0.25 -- goes around frame 17-19 of the anim
+		return BodyAnimCycle >= 0.25
 	end,
 }
 
 util.RegisterSafeAnim("grapple_pull", pullData)
-util.RegisterSafeAnim("grapple_pull_air", pullData) -- this is the fullbody anim, just only works for air :)
+util.RegisterSafeAnim("grapple_pull_air", pullData)
 
 function mod.init(ply)
 	return shared.GetStates(mod.config)

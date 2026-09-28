@@ -175,18 +175,11 @@ function mod.onSetupMove(ply, mv, state)
 		end
 	end
 
-	-- pulling an NPC/ragdoll instead of pulling ourselves to a surface: continuously push the target toward us
-	-- for the whole travel window instead of a single velocity application at arrival, since most NPCs run
-	-- their own navigation every tick and would otherwise instantly override a one-shot SetVelocity - NOT YET
-	-- CONFIRMED IN-GAME whether this is enough to actually beat that navigation for every NPC type
 	if state.phase == "traveling" and IsValid(state.targetEntity) then
 		if SERVER then
 			local target = state.targetEntity
 
 			if target:IsRagdoll() then
-				-- ragdolls are pure physics objects (one per bone) - moving the base entity does nothing.
-				-- only grab the specific limb the hook actually traced onto, not the whole ragdoll, and pull
-				-- from that limb's own position rather than the ragdoll's root
 				local phys = target:GetPhysicsObjectNum(state.targetPhysBone or 0)
 
 				if IsValid(phys) then
