@@ -18,7 +18,7 @@ return {
 	push_speed_multiplier = 1.25,
 	push_max_speed = 1200,
 
-	entity_pull_speed = 250, -- speed used to pull a grappled NPC/ragdoll toward the player (much gentler than push_speed)
+	entity_pull_speed = 550,
 
 	fall_damage_threshold = 700,
 	fall_damage_scale = 0.5,
