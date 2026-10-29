@@ -44,12 +44,12 @@ hook.Add("HUDPaint", "BeatrunGears_WingsuitHUD", function()
   local bgpadw = nickw
   local bgpadding = bgpadw > 200 and bgpadw + 40 or 200
 
-  local w = SScaleX(bgpadding) + 10 -- extend past the native box's width to the left
+  local w = BeatrunUI.S(bgpadding) + 10 -- extend past the native box's width to the left
   local h = 15
 
   local vp = GetConVar("Beatrun_HUDSway"):GetBool() and ply:GetViewPunchAngles() or Angle(0, 0, 0)
   local x = 20 - 15 + vp.z
-  local y = ScrH() * 0.895 + SScaleY(85) + 10 + vp.x -- sits just below the native corner box
+  local y = ScrH() * 0.895 + BeatrunUI.S(85) + 10 + vp.x -- sits just below the native corner box
 
   local cornerColor = string.ToColor(ply:GetInfo("Beatrun_HUDCornerColor"))
   local textColor = string.ToColor(ply:GetInfo("Beatrun_HUDTextColor"))
