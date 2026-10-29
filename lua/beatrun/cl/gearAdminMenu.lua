@@ -105,6 +105,8 @@ local function BuildPanel(panel)
     levelResetBtn:SetWide(45)
     levelResetBtn.DoClick = function()
       RunConsoleCommand("brgears_admin_setlevel", folder, "default")
+      -- the change itself doesn't rebuild the source admin's panel, so ask for one to show the default again
+      RunConsoleCommand("brgears_admin_refresh")
     end
 
     local tuningRowCount = 2
@@ -138,6 +140,7 @@ local function BuildPanel(panel)
       resetBtn:SetWide(45)
       resetBtn.DoClick = function()
         RunConsoleCommand("brgears_admin_settuning", folder, field, "default")
+        RunConsoleCommand("brgears_admin_refresh")
       end
     end
 

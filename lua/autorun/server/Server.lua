@@ -3,18 +3,14 @@ if engine.ActiveGamemode() ~= "beatrun" then
 	return
 end
 
-util.AddNetworkString("BeatrunGearsClientLevel")
 util.AddNetworkString("BeatrunGearsClientGearChanged")
 util.AddNetworkString("BeatrunGearsClientActivate")
 util.AddNetworkString("BeatrunGearsKeyPress")
 util.AddNetworkString("BeatrunGearsKeyRelease")
 util.AddNetworkString("BeatrunGearsAdminState")
-util.AddNetworkString("BeatrunGearsLevelSynced")
 
 local playerHandler = include("beatrun/sv/playerHandler.lua")
 local gearAdmin = include("beatrun/sh/modules.lua").Get("gearAdmin")
-
-local lastClientLevelTime = {} -- keyed by steamid64, so one player's update can't throttle another's
 
 local ACTIVATE_NET_INTERVAL = 0.2
 local ACTIVATE_FLOOD_LIMIT = 5
@@ -46,25 +42,6 @@ local function conCmdUnequipGear(ply, cmd, args)
 
 	local _, msg = playerHandler.UnequipGear(ply, args[1])
 	ply:ChatPrint(msg)
-end
-
-local function OnClientLevel(_, ply)
-	if game.IsDedicated() then return end
-
-	local steamid = ply:SteamID64()
-	if CurTime() - (lastClientLevelTime[steamid] or 0) < 5 then return end
-	lastClientLevelTime[steamid] = CurTime()
-
-	local data = playerHandler.plys[steamid]
-	if data == nil then return end
-
-	local newLevel = net.ReadInt(16)
-	data.beatrunlevel = newLevel
-
-	-- tells the client its real level has actually landed server-side, so auto-equip can safely fire instead
-	-- of guessing a delay long enough to beat this net round-trip
-	net.Start("BeatrunGearsLevelSynced")
-	net.Send(ply)
 end
 
 local function OnClientKeyPress(_, ply)
@@ -226,20 +203,7 @@ for _, folderName in ipairs(folders) do
 	end
 end
 
-local function OnPlayerInitialSpawn(ply)
-	playerHandler.OnPlayerSpawn(ply)
-
-	-- dedicated mode never needs a client level sync (ply:GetLevel() is already authoritative), so signal
-	-- readiness immediately instead of leaving the client waiting on a sync message that'll never arrive
-	if game.IsDedicated() then
-		net.Start("BeatrunGearsLevelSynced")
-		net.Send(ply)
-	end
-end
-
-hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", OnPlayerInitialSpawn)
-hook.Add("PlayerInitialSpawn", "BeatrunGearsAdminStateSync", gearAdmin.SendTo)
-net.Receive("BeatrunGearsClientLevel", OnClientLevel)
+hook.Add("PlayerInitialSpawn", "BeatrunGearsSpawn", playerHandler.OnPlayerSpawn)
 net.Receive("BeatrunGearsKeyPress", OnClientKeyPress)
 net.Receive("BeatrunGearsKeyRelease", OnClientKeyRelease)
 concommand.Add("brgears_equip", conCmdEquipGear)

@@ -38,13 +38,15 @@ local function ScanForKeyPress()
 end
 
 local function KeySlots(listPanel)
+	local S = BeatrunUI.S
+
 	local function AddKeybindRow(slotName, label)
 		local defaultKey = gearSlots.SLOTS[slotName].defaultKey
 
 		local row = vgui.Create("DButton", listPanel)
 		row:SetText("")
 		row:Dock(TOP)
-		row:SetTall(30)
+		row:SetTall(S(30))
 		row:DockMargin(0, 0, 0, 1)
 
 		row.Paint = function(self, w, h)
@@ -53,16 +55,19 @@ local function KeySlots(listPanel)
 			surface.SetDrawColor(0, 0, 0, 120)
 			surface.DrawRect(0, 0, w, h)
 
-			surface.SetFont("BeatrunGearMenuFont")
+			surface.SetFont("BeatrunUI")
+			local _, th = surface.GetTextSize(label)
+			local textY = (h - th) / 2
+
 			surface.SetTextColor(color_white)
-			surface.SetTextPos(10, 6)
+			surface.SetTextPos(S(10), textY)
 			surface.DrawText(label)
 
 			local rightText = listening and "PRESS A KEY..." or
 				(input.GetKeyName(keybinds.Get(slotName, defaultKey)) or "UNBOUND")
 			local tw = surface.GetTextSize(rightText)
 			surface.SetTextColor(listening and Color(255, 210, 90) or Color(180, 180, 180))
-			surface.SetTextPos(w - tw - 10, 6)
+			surface.SetTextPos(w - tw - S(10), textY)
 			surface.DrawText(rightText)
 		end
 
@@ -80,8 +85,8 @@ end
 local function GrapplerRopeColorer(listPanel)
 	local mixer = vgui.Create("DColorMixer", listPanel)
 	mixer:Dock(TOP)
-	mixer:SetTall(200)
-	mixer:DockMargin(0, 0, 0, 10)
+	mixer:SetTall(BeatrunUI.S(200))
+	mixer:DockMargin(0, 0, 0, BeatrunUI.S(10))
 	mixer:SetPalette(false)
 	mixer:SetAlphaBar(false)
 	mixer:SetWangs(true)
@@ -101,7 +106,7 @@ local function Sliders(listPanel)
 	local function AddSliderRow(entry)
 		local slider = vgui.Create("DNumSlider", listPanel)
 		slider:Dock(TOP)
-		slider:SetTall(30)
+		slider:SetTall(BeatrunUI.S(30))
 		slider:DockMargin(0, 0, 0, 1)
 		slider:SetText(entry.label)
 		slider:SetMin(entry.min)
@@ -133,6 +138,11 @@ hook.Add("Think", "BeatrunGears_SettingsKeyCapture", function()
 end)
 
 local function main(icon, window)
+	local S = BeatrunUI.S
+
+	-- DesktopWindows sizes are fixed at file load, before Beatrun's UI exists, so rescale here
+	window:SetSize(S(400), S(400))
+	window:Center()
 	window:SetTitle("")
 	window:ShowCloseButton(false)
 	window.Paint = function(self, w, h)
@@ -145,18 +155,18 @@ local function main(icon, window)
 
 	local title = vgui.Create("DLabel", window)
 	title:SetText("SETTINGS")
-	title:SetFont("BeatrunGearMenuTitleFont")
+	title:SetFont("BeatrunUILarge")
 	title:SetTextColor(color_white)
 	title:SetContentAlignment(5) -- centered
 	title:Dock(TOP)
-	title:SetTall(50)
+	title:SetTall(S(50))
 
 	local closeBtn = vgui.Create("DButton", window)
 	closeBtn:SetText("X")
-	closeBtn:SetFont("BeatrunGearMenuFont")
+	closeBtn:SetFont("BeatrunUI")
 	closeBtn:SetTextColor(color_white)
-	closeBtn:SetSize(24, 24)
-	closeBtn:SetPos(window:GetWide() - 30, 10)
+	closeBtn:SetSize(S(24), S(24))
+	closeBtn:SetPos(window:GetWide() - S(30), S(10))
 	closeBtn.Paint = function() end
 	closeBtn.DoClick = function()
 		window:Close()
@@ -164,16 +174,16 @@ local function main(icon, window)
 
 	local listPanel = vgui.Create("DScrollPanel", window)
 	listPanel:Dock(FILL)
-	listPanel:DockMargin(10, 0, 10, 10)
+	listPanel:DockMargin(S(10), 0, S(10), S(10))
 
 	local function AddSectionHeader(label)
 		local header = vgui.Create("DLabel", listPanel)
 		header:SetText(label)
-		header:SetFont("BeatrunGearMenuFont")
+		header:SetFont("BeatrunUI")
 		header:SetTextColor(Color(180, 180, 180))
 		header:Dock(TOP)
-		header:SetTall(28)
-		header:DockMargin(0, 10, 0, 2)
+		header:SetTall(S(28))
+		header:DockMargin(0, S(10), 0, S(2))
 	end
 
 	AddSectionHeader("KEYBINDS")

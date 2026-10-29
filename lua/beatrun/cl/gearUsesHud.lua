@@ -2,33 +2,6 @@
 local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
 local hudStyle = include("beatrun/cl/hudStyle.lua")
 
-surface.CreateFont("BeatrunGearUsesFont", {
-  font = "x14y24pxHeadUpDaisy",
-  shadow = true,
-  scanlines = 2,
-  weight = 500,
-  antialias = false,
-  size = 34,
-})
-
-surface.CreateFont("BeatrunGearUsesFontSmall", {
-  font = "x14y24pxHeadUpDaisy",
-  shadow = true,
-  scanlines = 2,
-  weight = 500,
-  antialias = false,
-  size = 20,
-})
-
-surface.CreateFont("BeatrunGearUsesLabelFont", {
-  font = "x14y24pxHeadUpDaisy",
-  shadow = true,
-  scanlines = 2,
-  weight = 500,
-  antialias = false,
-  size = 24,
-})
-
 local SLOT_ORDER = { "left", "right", "leg", "back" }
 local SLOT_LABELS = { left = "LEFT", right = "RIGHT", leg = "LEG", back = "BACK" }
 local BOX_WIDTH = 150 -- widened to fit the slot label alongside the number
@@ -88,17 +61,18 @@ hook.Add("HUDPaint", "BeatrunGearsUsesHud", function()
     local mainText = tostring(usesRemaining)
     local smallText = "/" .. gear.config.max_uses
     local textY = top + h / 2
+    local padding = BeatrunUI.S(LABEL_PADDING)
 
-    draw.SimpleText(SLOT_LABELS[slot], "BeatrunGearUsesLabelFont", x + LABEL_PADDING, textY, textColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(SLOT_LABELS[slot], "BeatrunHUD", x + padding, textY, textColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
-    surface.SetFont("BeatrunGearUsesFont")
+    surface.SetFont("BeatrunUILarge")
     local mainW = surface.GetTextSize(mainText)
-    surface.SetFont("BeatrunGearUsesFontSmall")
+    surface.SetFont("BeatrunHUDSmall")
     local smallW = surface.GetTextSize(smallText)
 
-    local numberX = x + w - LABEL_PADDING - mainW - smallW
-    draw.SimpleText(mainText, "BeatrunGearUsesFont", numberX, textY, numberColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-    draw.SimpleText(smallText, "BeatrunGearUsesFontSmall", numberX + mainW, textY + 4, numberColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    local numberX = x + w - padding - mainW - smallW
+    draw.SimpleText(mainText, "BeatrunUILarge", numberX, textY, numberColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(smallText, "BeatrunHUDSmall", numberX + mainW, textY + BeatrunUI.S(4), numberColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
     nextBottom = top - BOX_GAP
   end

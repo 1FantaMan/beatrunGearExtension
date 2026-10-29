@@ -1,14 +1,5 @@
 local mod = {}
 
-surface.CreateFont("BeatrunHUDFont", {
-  font = "x14y24pxHeadUpDaisy",
-  shadow = true,
-  scanlines = 2,
-  weight = 500,
-  antialias = false,
-  size = 28,
-})
-
 local blur = Material("pp/blurscreen")
 
 -- only safe to call from HUDPaint (absolute screen coords) -- do not use from a nested VGUI panel's .Paint
