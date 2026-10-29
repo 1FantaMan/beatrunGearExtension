@@ -1,22 +1,6 @@
-local gearsHandler = include("beatrun/sh/modules.lua").Get("gearsHandler")
-
-surface.CreateFont("BeatrunGearMenuFont", {
-	font = "x14y24pxHeadUpDaisy",
-	shadow = true,
-	scanlines = 2,
-	weight = 500,
-	antialias = false,
-	size = 22,
-})
-
-surface.CreateFont("BeatrunGearMenuTitleFont", {
-	font = "x14y24pxHeadUpDaisy",
-	shadow = true,
-	scanlines = 2,
-	weight = 500,
-	antialias = false,
-	size = 36,
-})
+local modules = include("beatrun/sh/modules.lua")
+local gearsHandler = modules.Get("gearsHandler")
+local gearAdmin = modules.Get("gearAdmin")
 
 local SLOTS_ORDERED = {
 	{ slot = "right", label = "RIGHT ARM" },
@@ -41,27 +25,30 @@ local autoEquip = LoadAutoEquip() -- { [slot] = gearName }
 
 local function RunAutoEquip()
 	for slot, name in pairs(autoEquip) do
-		RunConsoleCommand("brgears_equip", slot, name)
+		local gear = gearsHandler.GetClientGear(name)
+		if gear and LocalPlayer():GetLevel() >= gearAdmin.GetLevel(gear) then
+			RunConsoleCommand("brgears_equip", slot, name)
+		end
 	end
 end
 
+-- net messages sent from PlayerInitialSpawn can arrive before the client is ready, so the client asks for
+-- admin state itself; auto-equip waits for it because level overrides decide what's locked
 hook.Add("InitPostEntity", "BeatrunGearMenu_AutoEquip", function()
-	local done = false
-
-	net.Receive("BeatrunGearsLevelSynced", function()
-		if done then return end
-		done = true
+	hook.Add("BeatrunGearsAdminStateUpdated", "BeatrunGearMenu_AutoEquip", function()
+		hook.Remove("BeatrunGearsAdminStateUpdated", "BeatrunGearMenu_AutoEquip")
 		RunAutoEquip()
 	end)
 
-	timer.Simple(5, function()
-		if done then return end
-		done = true
-		RunAutoEquip()
-	end)
+	RunConsoleCommand("brgears_admin_refresh")
 end)
 
 local function main(icon, window)
+	local S = BeatrunUI.S
+
+	-- DesktopWindows sizes are fixed at file load, before Beatrun's UI exists, so rescale here
+	window:SetSize(S(500), S(600))
+	window:Center()
 	window:SetTitle("")
 	window:ShowCloseButton(false)
 	window.Paint = function(self, w, h)
@@ -74,18 +61,18 @@ local function main(icon, window)
 
 	local title = vgui.Create("DLabel", window)
 	title:SetText("GEAR")
-	title:SetFont("BeatrunGearMenuTitleFont")
+	title:SetFont("BeatrunUILarge")
 	title:SetTextColor(color_white)
 	title:SetContentAlignment(5) -- centered
 	title:Dock(TOP)
-	title:SetTall(50)
+	title:SetTall(S(50))
 
 	local closeBtn = vgui.Create("DButton", window)
 	closeBtn:SetText("X")
-	closeBtn:SetFont("BeatrunGearMenuFont")
+	closeBtn:SetFont("BeatrunUI")
 	closeBtn:SetTextColor(color_white)
-	closeBtn:SetSize(24, 24)
-	closeBtn:SetPos(window:GetWide() - 30, 10)
+	closeBtn:SetSize(S(24), S(24))
+	closeBtn:SetPos(window:GetWide() - S(30), S(10))
 	closeBtn.Paint = function() end -- no button background, just the X text
 	closeBtn.DoClick = function()
 		window:Close()
@@ -93,43 +80,44 @@ local function main(icon, window)
 
 	local listPanel = vgui.Create("DScrollPanel", window)
 	listPanel:Dock(FILL)
-	listPanel:DockMargin(10, 0, 10, 10)
+	listPanel:DockMargin(S(10), 0, S(10), S(10))
 
 	local function AddSectionHeader(label)
 		local header = vgui.Create("DLabel", listPanel)
 		header:SetText(label)
-		header:SetFont("BeatrunGearMenuFont")
+		header:SetFont("BeatrunUI")
 		header:SetTextColor(Color(180, 180, 180))
 		header:Dock(TOP)
-		header:SetTall(28)
-		header:DockMargin(0, 10, 0, 2)
+		header:SetTall(S(28))
+		header:DockMargin(0, S(10), 0, S(2))
 	end
 
-	local FAVORITE_ICON_SIZE = 22
-	local FAVORITE_ICON_PADDING = 4
+	local FAVORITE_ICON_SIZE = S(22)
+	local FAVORITE_ICON_PADDING = S(4)
 
 	local function AddGearRow(slot, gear)
 		local isEquipped = LocalPlayer():GetNW2String("brgear_" .. slot, "") == gear.name
-		local isLocked = LocalPlayer():GetLevel() < gear.config.level
+		local requiredLevel = gearAdmin.GetLevel(gear)
+		local isLocked = LocalPlayer():GetLevel() < requiredLevel
 
 		local row = vgui.Create("DButton", listPanel)
 		row:SetText("")
 		row:Dock(TOP)
-		row:SetTall(30)
+		row:SetTall(S(30))
 		row:DockMargin(0, 0, 0, 1)
 
 		local textColor = isEquipped and color_white or Color(180, 180, 180)
 
 		local nameLabel = vgui.Create("DLabel", row)
-		nameLabel:SetFont("BeatrunGearMenuFont")
+		nameLabel:SetFont("BeatrunUI")
 		nameLabel:SetTextColor(textColor)
 		nameLabel:SetText(gear.config.displayname)
 		nameLabel:SizeToContents()
 
 		local levelLabel = vgui.Create("DLabel", row)
-		levelLabel:SetFont("BeatrunGearMenuFont")
+		levelLabel:SetFont("BeatrunUI")
 		levelLabel:SetTextColor(textColor)
-		levelLabel:SetText("LEVEL " .. gear.config.level)
+		levelLabel:SetText("LEVEL " .. requiredLevel)
 		levelLabel:SizeToContents()
 
 		row.PerformLayout = function(self, w, h)
@@ -162,7 +150,7 @@ local function main(icon, window)
 			surface.SetDrawColor(0, 0, 0, 235)
 			surface.DrawRect(0, 0, w, h)
 
-			surface.SetFont("BeatrunGearMenuFont")
+			surface.SetFont("BeatrunUI")
 			surface.SetTextColor(Color(220, 40, 40))
 			local tw, th = surface.GetTextSize("LOCKED")
 			surface.SetTextPos((w - tw) / 2, (h - th) / 2)

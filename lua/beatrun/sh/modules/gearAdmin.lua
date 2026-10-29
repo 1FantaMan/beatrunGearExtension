@@ -74,7 +74,9 @@ function mod.CanManage(ply)
   if not IsValid(ply) then return true end -- server console
 
   if CAMI then
-    local access = CAMI.PlayerHasAccess(ply, PRIVILEGE_NAME, nil)
+    -- ULib calls the callback unconditionally, so a nil one crashes; sources that answer async leave access nil
+    local access
+    CAMI.PlayerHasAccess(ply, PRIVILEGE_NAME, function(hasAccess) access = hasAccess end)
     if access ~= nil then return access end
   end
 
@@ -110,6 +112,7 @@ function mod.ClearTuning(name, field)
   if mod.state.tuning[name] then
     mod.state.tuning[name][field] = nil
   end
+  ApplyTuning(name)
   SaveState()
 end
 
@@ -163,27 +166,29 @@ if SERVER then
     return util.TableToJSON({ state = mod.state, presetNames = PresetNames() })
   end
 
-  function mod.SendTo(ply)
+  local function Send(recipients, rebuildPanel)
     net.Start("BeatrunGearsAdminState")
       net.WriteString(Payload())
-    net.Send(ply)
+      net.WriteBool(rebuildPanel)
+    net.Send(recipients)
   end
 
-  -- excludePly skips the admin who just made the change - their own panel already reflects it locally,
-  -- and rebroadcasting to them would rebuild their panel mid-edit (destroying the widget they're using)
-  function mod.Broadcast(excludePly)
-    local recipients = {}
+  function mod.SendTo(ply)
+    Send(ply, true)
+  end
+
+  -- the admin who made the change still needs the new state (the gear menu gates levels client-side),
+  -- but rebuilding their panel would destroy the widget they're mid-edit in
+  function mod.Broadcast(sourcePly)
+    local others = {}
     for _, ply in ipairs(player.GetAll()) do
-      if ply ~= excludePly then
-        recipients[#recipients + 1] = ply
+      if ply ~= sourcePly then
+        others[#others + 1] = ply
       end
     end
 
-    if #recipients == 0 then return end
-
-    net.Start("BeatrunGearsAdminState")
-      net.WriteString(Payload())
-    net.Send(recipients)
+    if #others > 0 then Send(others, true) end
+    if IsValid(sourcePly) then Send(sourcePly, false) end
   end
 else
   mod.presetNames = {}
@@ -193,11 +198,13 @@ else
 
   net.Receive("BeatrunGearsAdminState", function()
     local payload = util.JSONToTable(net.ReadString())
+    local rebuildPanel = net.ReadBool()
     mod.state = payload.state
     mod.presetNames = payload.presetNames
     ApplyAllTuning()
 
-    if mod.OnStateUpdated then mod.OnStateUpdated() end
+    if rebuildPanel and mod.OnStateUpdated then mod.OnStateUpdated() end
+    hook.Run("BeatrunGearsAdminStateUpdated")
   end)
 end
 

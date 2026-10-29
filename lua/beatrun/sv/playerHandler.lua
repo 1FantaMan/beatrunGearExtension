@@ -77,21 +77,9 @@ local function OnSetupMove(ply, mv, cmd)
 	end
 end
 
-function mod.GetLevel(ply)
-	if not game.IsDedicated() then
-		local data = mod.plys[ply:SteamID64()]
-		if data == nil then return end
-
-		return data.beatrunlevel
-	else
-		return ply:GetLevel()
-	end
-end
-
 function mod.OnPlayerSpawn(ply)
 	local newData = {}
 
-	newData.beatrunlevel = 1 -- read by mod.GetLevel on non-dedicated servers, where Beatrun's own GetLevel() is unavailable
 	newData.gears = {}
 
 	for gearType, _ in pairs(gearSlots.SLOTS) do
@@ -135,7 +123,9 @@ function mod.EquipGear(ply, slot, name)
 		return false, "'" .. name .. "' gear isnt indentical to the slot: '" .. slot .. "'"
 	end
 
-	if mod.GetLevel(ply) < gearAdmin.GetLevel(gear) then
+	-- off dedicated, Beatrun keeps XP client-side only (sv/XP.lua bails out, ply:GetLevel doesn't exist here),
+	-- so the level gate lives in the gear menu instead
+	if game.IsDedicated() and ply:GetLevel() < gearAdmin.GetLevel(gear) then
 		return false, "'" .. name .. "' gear's level is higher than the player."
 	end
 
