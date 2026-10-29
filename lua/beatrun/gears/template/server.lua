@@ -1,7 +1,9 @@
+local shared = include("beatrun/gears/template/shared.lua")
+
 local mod = {}
 
 function mod.init(ply)
-  return {}
+  return shared.GetStates(mod.config)
 end
 
 function mod.activate(ply, state)
